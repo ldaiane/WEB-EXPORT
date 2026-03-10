@@ -3,181 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WA Ultimate Pro</title>
+    <title>WA MASTER CHRONO</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { --wa-green: #075e54; --wa-teal: #128c7e; --wa-light: #25d366; --bg: #e5ddd5; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: sans-serif; margin: 0; background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        :root { --wa-green: #075e54; --wa-light: #25d366; --bg: #d1d7db; }
+        * { box-sizing: border-box; font-family: -apple-system, sans-serif; }
+        body { margin: 0; background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        /* Cabeçalho e Abas */
-        header { background: var(--wa-green); color: white; padding: 10px; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        .tabs { display: flex; background: var(--wa-green); }
-        .tab { flex: 1; padding: 15px; text-align: center; font-weight: bold; color: rgba(255,255,255,0.6); cursor: pointer; text-transform: uppercase; font-size: 13px; }
-        .tab.active { color: white; border-bottom: 3px solid white; }
+        header { background: var(--wa-green); color: white; padding: 12px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .tabs { display: flex; background: var(--wa-green); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .tab { flex: 1; padding: 15px; text-align: center; font-weight: bold; color: rgba(255,255,255,0.6); cursor: pointer; border-bottom: 3px solid transparent; }
+        .tab.active { color: white; border-bottom-color: white; }
 
-        /* Controles */
-        .controls { padding: 10px; background: var(--wa-teal); display: flex; flex-direction: column; gap: 8px; }
-        .search-bar { display: flex; gap: 8px; }
-        input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 16px; outline: none; }
-        .btn { border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; background: rgba(255,255,255,0.2); }
-        .btn-import { background: var(--wa-light) !important; width: 100%; padding: 15px; display: block; text-align: center; border-radius: 8px; font-weight: bold; color: white; text-decoration: none; margin-top: 5px; }
+        .controls { background: #f0f2f5; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #ccc; }
+        .row { display: flex; gap: 5px; }
+        input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; }
+        .btn { border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; background: var(--wa-green); }
+        .btn-import { background: var(--wa-light) !important; color: #000; width: 100%; padding: 15px; display: block; text-align: center; border-radius: 8px; font-weight: bold; text-decoration: none; }
 
-        /* Áreas de Conteúdo */
-        main { flex: 1; overflow-y: auto; position: relative; }
-        #view-chat, #view-gallery { display: none; padding: 15px; }
-        #view-chat.active, #view-gallery.active { display: block; }
+        main { flex: 1; overflow-y: auto; position: relative; background: #e5ddd5; }
+        .view { display: none; padding: 15px; flex-direction: column; gap: 10px; }
+        .view.active { display: flex; }
 
-        /* Balões de Chat */
-        .msg { background: white; padding: 10px; border-radius: 10px; margin-bottom: 10px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.15); border-left: 4px solid var(--wa-light); }
-        .sender { font-weight: bold; color: var(--wa-green); font-size: 12px; display: block; margin-bottom: 3px; }
-        .text { font-size: 15px; color: #333; word-wrap: break-word; line-height: 1.4; }
-        .time { font-size: 10px; color: #999; text-align: right; margin-top: 5px; }
+        /* Estilo Balões */
+        .msg { background: white; padding: 10px; border-radius: 8px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 1px rgba(0,0,0,0.2); position: relative; animation: fadeIn 0.3s ease; }
+        .msg.me { align-self: flex-end; background: #dcf8c6; }
+        .sender { font-weight: bold; color: #e91e63; font-size: 11px; margin-bottom: 4px; display: block; }
+        .text { font-size: 14.5px; color: #111; word-wrap: break-word; line-height: 1.4; white-space: pre-wrap; }
+        .time { font-size: 10px; color: #667781; text-align: right; margin-top: 4px; }
 
-        /* Mídias */
-        .m-wrap { margin-top: 8px; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; background: #f0f0f0; }
-        img, video { max-width: 100%; display: block; height: auto; }
-        audio { width: 100%; height: 40px; }
-        .pdf-btn { display: flex; align-items: center; gap: 10px; padding: 12px; text-decoration: none; color: #333; font-weight: bold; font-size: 13px; }
-
-        /* Galeria */
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-        .grid-item { aspect-ratio: 1/1; background: #ccc; border-radius: 4px; overflow: hidden; position: relative; cursor: pointer; }
+        /* Mídia */
+        .m-content { margin-top: 8px; border-radius: 4px; overflow: hidden; border: 1px solid #ddd; background: #f8f9fa; }
+        img, video { max-width: 100%; display: block; height: auto; cursor: pointer; }
+        audio { width: 100%; height: 40px; margin-top: 5px; }
+        
+        /* Galeria Grid */
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+        .grid-item { aspect-ratio: 1/1; background: #e2e2e2; border-radius: 2px; overflow: hidden; position: relative; cursor: pointer; }
         .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; }
-        .type-icon { position: absolute; bottom: 5px; right: 5px; font-size: 12px; background: rgba(0,0,0,0.5); color: white; padding: 2px 4px; border-radius: 3px; }
+        .tag { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; padding: 2px 5px; font-size: 10px; border-radius: 3px; }
 
-        /* Overlay de Progresso */
-        #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; padding: 30px; text-align: center; }
-        .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top-color: var(--wa-light); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
-        .bar-bg { width: 100%; background: #333; height: 12px; border-radius: 6px; margin: 15px 0; overflow: hidden; }
+        #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.98); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        .bar-wrap { width: 100%; background: #ddd; height: 10px; border-radius: 5px; margin: 20px 0; overflow: hidden; }
         #bar { background: var(--wa-light); width: 0%; height: 100%; transition: 0.1s; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
     <header>
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-weight:bold; font-size:18px;">WhatsApp History <span id="msg-count"></span></span>
-            <button class="btn" onclick="clearDB()" style="background:#d9534f">Limpar Banco</button>
+            <span style="font-weight:bold; font-size:18px;">WA Chrono Viewer</span>
+            <button class="btn" onclick="resetDB()" style="background:#ea4335; font-size:12px;">Limpar Tudo</button>
         </div>
     </header>
 
     <div class="tabs">
-        <div class="tab active" onclick="showTab('chat')">Conversas</div>
-        <div class="tab" onclick="showTab('gallery')">Galeria</div>
+        <div class="tab active" onclick="tab('chat-view')">Mensagens</div>
+        <div class="tab" onclick="tab('gallery-view')">Galeria</div>
     </div>
 
     <div class="controls">
-        <div class="search-bar">
-            <input type="text" id="searchInp" placeholder="Pesquisar mensagens...">
-            <button class="btn" onclick="doSearch()">🔍</button>
+        <div class="row">
+            <input type="text" id="search" placeholder="🔍 Buscar na conversa...">
+            <button class="btn" onclick="renderChat(document.getElementById('search').value)">🔍</button>
         </div>
-        <label for="fileInp" class="btn-import">📂 ADICIONAR ZIPs / PASTAS / ARQUIVOS</label>
-        <input type="file" id="fileInp" multiple webkitdirectory directory style="display: none;">
+        <label for="files" class="btn-import">📂 IMPORTAR ZIPs / PASTAS</label>
+        <input type="file" id="files" multiple webkitdirectory directory style="display: none;">
     </div>
 
-    <main id="main-scroll">
-        <div id="view-chat" class="active"></div>
-        <div id="view-gallery"><div class="grid" id="gallery-grid"></div></div>
+    <main id="scroll-area">
+        <div id="chat-view" class="view active"></div>
+        <div id="gallery-view" class="view"><div class="grid" id="grid"></div></div>
     </main>
 
-    <div id="loading">
-        <div class="spinner"></div>
-        <h3 id="load-status">Lendo arquivos...</h3>
-        <div class="bar-bg"><div id="bar"></div></div>
-        <p id="load-info" style="font-size:12px; color:#aaa;"></p>
+    <div id="loader">
+        <h2 id="l-title">Organizando Backup...</h2>
+        <div class="bar-wrap"><div id="bar"></div></div>
+        <p id="l-info" style="font-weight: bold; color: var(--wa-green);"></p>
+        <p style="font-size: 11px; color: #777;">Processando ordem cronológica e rejeitando duplicatas...</p>
     </div>
 
     <script>
         let db;
-        const DB_NAME = "WA_PRO_STORAGE";
-        
-        // Inicialização do Banco de Dados com Índice Único Anti-Duplicata
-        const request = indexedDB.open(DB_NAME, 5);
-        request.onupgradeneeded = e => {
-            let d = e.target.result;
-            if (d.objectStoreNames.contains("msgs")) d.deleteObjectStore("msgs");
-            if (d.objectStoreNames.contains("media")) d.deleteObjectStore("media");
-            
-            const msgStore = d.createObjectStore("msgs", { keyPath: "id", autoIncrement: true });
-            msgStore.createIndex("hash", "hash", { unique: true }); // A mágica acontece aqui
-            d.createObjectStore("media", { keyPath: "name" });
-        };
-        request.onsuccess = e => { db = e.target.result; refreshUI(); };
+        const DB_NAME = "WA_CHRONO_FINAL";
 
-        // Troca de Abas
-        function showTab(tab) {
+        const req = indexedDB.open(DB_NAME, 2);
+        req.onupgradeneeded = e => {
+            const d = e.target.result;
+            if (d.objectStoreNames.contains("msgs")) d.deleteObjectStore("msgs");
+            const ms = d.createObjectStore("msgs", { keyPath: "id", autoIncrement: true });
+            ms.createIndex("hash", "hash", { unique: true });
+            ms.createIndex("timestamp", "ts", { unique: false });
+            if (!d.objectStoreNames.contains("media")) d.createObjectStore("media", { keyPath: "name" });
+        };
+        req.onsuccess = e => { db = e.target.result; renderChat(); };
+
+        function tab(id) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('main > div').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             event.target.classList.add('active');
-            if(tab === 'chat') {
-                document.getElementById('view-chat').classList.add('active');
-                renderChat();
-            } else {
-                document.getElementById('view-gallery').classList.add('active');
-                renderGallery();
-            }
+            document.getElementById(id).classList.add('active');
+            if(id === 'gallery-view') renderGallery();
         }
 
-        // Importação de Arquivos (Múltiplos ZIPs, Pastas e Avulsos)
-        document.getElementById('fileInp').onchange = async (e) => {
+        document.getElementById('files').onchange = async (e) => {
             const files = Array.from(e.target.files);
             if (!files.length) return;
-            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('loader').style.display = 'flex';
             
-            let totalNewMsgs = 0;
-            let totalDups = 0;
-            let totalMedia = 0;
+            let stats = { s: 0, d: 0, m: 0 };
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                document.getElementById('load-status').innerText = `Importando: ${file.name}`;
                 document.getElementById('bar').style.width = `${((i+1)/files.length)*100}%`;
 
-                if (file.name.endsWith('.zip')) {
+                if (file.name.toLowerCase().endsWith('.zip')) {
                     const zip = await JSZip.loadAsync(file);
                     const entries = Object.keys(zip.files).filter(k => !zip.files[k].dir);
                     for (let entryName of entries) {
-                        const entry = zip.files[entryName];
                         const fName = entryName.split('/').pop();
-                        if (fName.endsWith('.txt')) {
-                            const txt = await entry.async("string");
-                            const res = await saveMsgs(parse(txt));
-                            totalNewMsgs += res.saved;
-                            totalDups += res.dups;
+                        const entry = zip.files[entryName];
+                        if (fName.toLowerCase().endsWith('.txt')) {
+                            const res = await saveMsgs(parse(await entry.async("string")));
+                            stats.s += res.s; stats.d += res.d;
                         } else {
-                            const blob = await entry.async("blob");
-                            await saveMedia(fName, blob);
-                            totalMedia++;
+                            await saveMedia(fName, await entry.async("blob"));
+                            stats.m++;
                         }
                     }
-                } else if (file.name.endsWith('.txt')) {
-                    const txt = await file.text();
-                    const res = await saveMsgs(parse(txt));
-                    totalNewMsgs += res.saved;
-                    totalDups += res.dups;
+                } else if (file.name.toLowerCase().endsWith('.txt')) {
+                    const res = await saveMsgs(parse(await file.text()));
+                    stats.s += res.s; stats.d += res.d;
                 } else {
                     await saveMedia(file.name, file);
-                    totalMedia++;
+                    stats.m++;
                 }
+                document.getElementById('l-info').innerText = `${stats.s} novas / ${stats.d} duplicadas`;
             }
-            
-            document.getElementById('loading').style.display = 'none';
-            alert(`IMPORTAÇÃO CONCLUÍDA!\n\n✅ Novas mensagens: ${totalNewMsgs}\n🚫 Duplicatas rejeitadas: ${totalDups}\n📂 Arquivos de mídia: ${totalMedia}`);
+
+            document.getElementById('loader').style.display = 'none';
+            alert(`ORDEM CRONOLÓGICA CONCLUÍDA!\n\n✅ Mensagens: ${stats.s}\n🚫 Duplicatas: ${stats.d}\n📂 Arquivos: ${stats.m}`);
             location.reload();
         };
 
         function parse(txt) {
-            const regex = /\[?(\d{2}[.\/-]\d{2}[.\/-]\d{2,4}).*?\]?[\s-]*?([^:]+):\s(.+)/;
+            // Regex flexível para diferentes formatos de data [DD/MM/YY HH:MM:SS] ou DD/MM/YYYY - Pessoa:
+            const regex = /\[?(\d{2})[.\/-](\d{2})[.\/-](\d{2,4})[, ]+(\d{2}:\d{2})(?::\d{2})?\]?[\s-]*?([^:]+):\s(.+)/;
             return txt.split("\n").map(l => {
                 const m = l.match(regex);
                 if (!m) return null;
-                const sender = m[2];
-                const text = m[3].trim();
-                // Hash único para evitar duplicatas (Data + Remetente + Texto)
-                const hash = btoa(unescape(encodeURIComponent(m[1] + sender + text))).substring(0, 100);
-                return { date: m[1], sender, text, hash, ts: Date.now() };
+                
+                const d = m[1], mo = m[2], y = m[3].length === 2 ? "20"+m[3] : m[3];
+                const time = m[4], sender = m[5].trim(), text = m[6].trim();
+                
+                // Cria timestamp para ordenação real
+                const ts = new Date(`${y}-${mo}-${d}T${time}:00`).getTime();
+                const hash = btoa(unescape(encodeURIComponent(ts + sender + text.substring(0,50))));
+                
+                return { date: `${d}/${mo}/${y}`, time, sender, text, ts, hash };
             }).filter(x => x);
         }
 
@@ -185,13 +169,13 @@
             return new Promise(r => {
                 const tx = db.transaction("msgs", "readwrite");
                 const store = tx.objectStore("msgs");
-                let saved = 0, dups = 0;
-                data.forEach(d => {
-                    const req = store.add(d);
-                    req.onsuccess = () => saved++;
-                    req.onerror = (e) => { e.preventDefault(); e.stopPropagation(); dups++; };
+                let s = 0, d = 0;
+                data.forEach(msg => {
+                    const q = store.add(msg);
+                    q.onsuccess = () => s++;
+                    q.onerror = (e) => { e.preventDefault(); e.stopPropagation(); d++; };
                 });
-                tx.oncomplete = () => r({saved, dups});
+                tx.oncomplete = () => r({s, d});
             });
         }
 
@@ -203,72 +187,66 @@
             });
         }
 
-        // Renderização do Chat
-        async function renderChat(filter = null) {
-            const container = document.getElementById('view-chat');
-            container.innerHTML = "Carregando mensagens...";
+        async function renderChat(filter = "") {
+            const container = document.getElementById('chat-view');
+            container.innerHTML = "Ordenando cronologicamente...";
             const tx = db.transaction(["msgs", "media"], "readonly");
             const mediaKeys = await new Promise(r => tx.objectStore("media").getAllKeys().onsuccess = ev => r(ev.target.result));
             
-            const msgs = [];
-            tx.objectStore("msgs").openCursor().onsuccess = async e => {
-                const cursor = e.target.result;
-                if (cursor) {
-                    if (!filter || cursor.value.text.toLowerCase().includes(filter)) msgs.push(cursor.value);
-                    cursor.continue();
-                } else {
-                    container.innerHTML = "";
-                    const frag = document.createDocumentFragment();
-                    for (let m of msgs.slice(-300)) { // Últimas 300 para ser rápido
-                        const div = document.createElement('div');
-                        div.className = 'msg';
-                        let mediaHtml = "";
-                        
-                        const cleanText = m.text.toLowerCase().replace(/[<>:" ]/g, "");
-                        const found = mediaKeys.find(k => cleanText.includes(k.toLowerCase()) || k.toLowerCase().includes(cleanText));
+            tx.objectStore("msgs").index("timestamp").getAll().onsuccess = async e => {
+                let msgs = e.target.result;
+                if(filter) msgs = msgs.filter(m => m.text.toLowerCase().includes(filter.toLowerCase()));
+                
+                container.innerHTML = "";
+                const frag = document.createDocumentFragment();
+                
+                for (let m of msgs.slice(-500)) { // Mostra as 500 mais recentes ordenadas
+                    const div = document.createElement('div');
+                    div.className = `msg ${m.sender.toLowerCase().includes('você') ? 'me' : ''}`;
+                    let mHtml = "";
+                    
+                    const clean = m.text.toLowerCase().replace(/[<>:" ]/g, "");
+                    const found = mediaKeys.find(k => clean.includes(k.toLowerCase()) || k.toLowerCase().includes(clean));
 
-                        if (found && m.text.length > 2) {
-                            const mData = await new Promise(r => db.transaction("media").objectStore("media").get(found).onsuccess = ev => r(ev.target.result?.data));
-                            if (mData) {
-                                const url = URL.createObjectURL(mData);
-                                if (found.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mediaHtml = `<div class="m-wrap"><img src="${url}" onclick="window.open('${url}')"></div>`;
-                                else if (found.match(/\.(mp4|webm|3gp)$/i)) mediaHtml = `<div class="m-wrap"><video src="${url}" controls></video></div>`;
-                                else if (found.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) mediaHtml = `<div class="m-wrap"><audio src="${url}" controls></audio></div>`;
-                                else if (found.match(/\.pdf$/i)) mediaHtml = `<a href="${url}" target="_blank" class="pdf-btn">📄 VER PDF: ${found}</a>`;
-                            }
+                    if (found && m.text.length > 2) {
+                        const blob = await new Promise(r => db.transaction("media").objectStore("media").get(found).onsuccess = ev => r(ev.target.result?.data));
+                        if (blob) {
+                            const url = URL.createObjectURL(blob);
+                            if (found.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mHtml = `<div class="m-content"><img src="${url}" onclick="window.open('${url}')"></div>`;
+                            else if (found.match(/\.(mp4|webm|3gp)$/i)) mHtml = `<div class="m-content"><video src="${url}" controls></video></div>`;
+                            else if (found.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) mHtml = `<audio src="${url}" controls></audio>`;
+                            else if (found.match(/\.pdf$/i)) mHtml = `<div class="m-content" onclick="window.open('${url}')" style="padding:10px; cursor:pointer;">📄 PDF: ${found}</div>`;
                         }
-
-                        div.innerHTML = `<span class="sender">${m.sender}</span><div class="text">${m.text}</div>${mediaHtml}<div class="time">${m.date}</div>`;
-                        frag.appendChild(div);
                     }
-                    container.appendChild(frag);
-                    document.getElementById('main-scroll').scrollTop = container.scrollHeight;
+                    div.innerHTML = `<span class="sender">${m.sender}</span><div class="text">${m.text}</div>${mHtml}<div class="time">${m.date} ${m.time}</div>`;
+                    frag.appendChild(div);
                 }
+                container.appendChild(frag);
+                document.getElementById('scroll-area').scrollTop = container.scrollHeight;
             };
         }
 
-        // Renderização da Galeria
         async function renderGallery() {
-            const grid = document.getElementById('gallery-grid');
-            grid.innerHTML = "Carregando mídias...";
+            const grid = document.getElementById('grid');
+            grid.innerHTML = "Ordenando mídias...";
             db.transaction("media").objectStore("media").getAll().onsuccess = e => {
+                // Ordena galeria pelo nome (WhatsApp salva como IMG-YYYYMMDD...)
+                let items = e.target.result.sort((a,b) => b.name.localeCompare(a.name));
                 grid.innerHTML = "";
-                e.target.result.forEach(item => {
+                items.forEach(item => {
                     const url = URL.createObjectURL(item.data);
-                    const div = document.createElement('div');
-                    div.className = 'grid-item';
-                    if (item.name.match(/\.(jpg|jpeg|png|webp|gif)$/i)) div.innerHTML = `<img src="${url}" onclick="window.open('${url}')">`;
-                    else if (item.name.match(/\.(mp4|webm|3gp)$/i)) div.innerHTML = `<video src="${url}"></video><span class="type-icon">🎥</span>`;
-                    else if (item.name.match(/\.pdf$/i)) div.innerHTML = `<div style="display:flex; height:100%; align-items:center; justify-content:center; background:#eee;" onclick="window.open('${url}')">PDF</div><span class="type-icon">📄</span>`;
+                    const d = document.createElement('div');
+                    d.className = 'grid-item';
+                    if (item.name.match(/\.(jpg|jpeg|png|webp|gif)$/i)) d.innerHTML = `<img src="${url}" onclick="window.open('${url}')">`;
+                    else if (item.name.match(/\.(mp4|webm|3gp)$/i)) d.innerHTML = `<video src="${url}"></video><span class="tag">🎥</span>`;
+                    else if (item.name.match(/\.pdf$/i)) d.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:10px;" onclick="window.open('${url}')">PDF</div><span class="tag">📄</span>`;
                     else return;
-                    grid.appendChild(div);
+                    grid.appendChild(d);
                 });
             };
         }
 
-        function doSearch() { renderChat(document.getElementById('searchInp').value.toLowerCase()); }
-        function clearDB() { if(confirm("Isso apagará todos os backups do navegador. Confirmar?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } }
-        function refreshUI() { db.transaction("msgs").objectStore("msgs").count().onsuccess = e => document.getElementById('msg-count').innerText = `(${e.target.result})`; renderChat(); }
+        function resetDB() { if(confirm("Apagar todos os dados e começar do zero?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } }
     </script>
 </body>
 </html>
