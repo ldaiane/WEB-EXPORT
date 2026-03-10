@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Chat Archive Viewer</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+</head>
+
+<body>
+
+<header>
+
+<div class="logo">Chat Viewer</div>
+
+<div class="actions">
+
+<button onclick="fileInput.click()">Importar</button>
+
+</div>
+
+</header>
+
+<div id="chatList"></div>
+
+<div id="chatView">
+
+<div class="chatHeader">
+
+<button onclick="closeChat()">←</button>
+
+<div id="chatTitle"></div>
+
+</div>
+
+<div id="messages"></div>
+
+</div>
+
+<input type="file" id="fileInput" multiple hidden>
+
+<script src="app.js"></script>
+
+</body>
+</html>
