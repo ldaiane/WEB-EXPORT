@@ -1,0 +1,90 @@
+body{
+margin:0;
+font-family:-apple-system,Arial;
+background:#ece5dd;
+height:100vh;
+display:flex;
+flex-direction:column;
+}
+
+header{
+height:55px;
+background:#fff;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 15px;
+border-bottom:1px solid #ddd;
+}
+
+#chatList{
+flex:1;
+overflow:auto;
+background:#fff;
+}
+
+.chatItem{
+padding:15px;
+border-bottom:1px solid #eee;
+cursor:pointer;
+}
+
+#chatView{
+display:none;
+flex-direction:column;
+height:100%;
+}
+
+.chatHeader{
+height:55px;
+background:#fff;
+display:flex;
+align-items:center;
+gap:10px;
+padding:0 10px;
+border-bottom:1px solid #ddd;
+}
+
+#messages{
+flex:1;
+overflow:auto;
+padding:12px;
+}
+
+.msg{
+padding:8px 12px;
+border-radius:10px;
+margin-bottom:12px;
+max-width:75%;
+background:#fff;
+}
+
+.sender{
+font-size:12px;
+font-weight:bold;
+margin-bottom:2px;
+}
+
+.time{
+font-size:11px;
+color:#666;
+text-align:right;
+margin-top:4px;
+}
+
+.origin{
+font-size:10px;
+color:#888;
+}
+
+.media img,
+.media video{
+max-width:100%;
+border-radius:8px;
+margin-top:5px;
+}
+
+audio{
+width:200px;
+margin-top:5px;
+}
