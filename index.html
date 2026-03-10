@@ -3,27 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chat Viewer - Histórico Permanente</title>
+    <title>Chat Viewer Pro</title>
     <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
 
     <header>
         <div class="brand">Meu Histórico</div>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="🔍 Pesquisar mensagens..." oninput="filterMessages()">
+        </div>
         <div class="actions">
-            <button onclick="clearHistory()" class="btn-clear">Limpar Tudo</button>
-            
-            <label for="fileInput" class="btn-import">📄 Arquivos/ZIP</label>
+            <button onclick="clearHistory()" class="btn-clear">Limpar</button>
+            <label for="fileInput" class="btn-import">📄 ZIP/TXT</label>
             <input type="file" id="fileInput" multiple accept=".txt,.zip" style="display: none;">
-
-            <label for="folderInput" class="btn-import">📂 Importar Pasta</label>
+            <label for="folderInput" class="btn-import">📂 Pasta</label>
             <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
         </div>
     </header>
 
     <main id="chatView">
         <div id="messages">
-            <div class="welcome-msg">Histórico vazio. Importe arquivos, ZIPs ou pastas do WhatsApp.</div>
+            <div class="welcome-msg">
+                <h3>Nenhuma mensagem encontrada.</h3>
+                <p>Importe um arquivo .txt, um .zip ou uma pasta extraída do WhatsApp.</p>
+            </div>
         </div>
     </main>
 
