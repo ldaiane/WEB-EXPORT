@@ -2,8 +2,8 @@ let db;
 let allMessages = [];
 let mediaCache = new Map();
 
-// Abre o banco com versão alta para garantir reset de bugs
-const request = indexedDB.open("WhatsAppHistoryDB", 40);
+// Abre o banco de dados - Versão 50
+const request = indexedDB.open("WhatsAppHistoryDB", 50);
 
 request.onupgradeneeded = e => {
     db = e.target.result;
@@ -26,7 +26,7 @@ async function loadHistory() {
 
     msgsReq.onsuccess = () => {
         allMessages = msgsReq.result.sort((a, b) => a.ts - b.ts);
-        document.getElementById("stats").innerText = `(${allMessages.length} msgs)`;
+        document.getElementById("stats").innerText = `(${allMessages.length})`;
         mediaReq.onsuccess = () => {
             mediaCache.clear();
             mediaReq.result.forEach(m => mediaCache.set(m.name, URL.createObjectURL(m.data)));
@@ -35,94 +35,99 @@ async function loadHistory() {
     };
 }
 
-// O NOVO MOTOR DE PROCESSAMENTO
+// MOTOR DE FILA SEQUENCIAL (NUNCA REUTILIZA TRANSAÇÃO)
 const processFiles = async (files) => {
     if (!files.length) return;
-    
     const overlay = document.getElementById("loadingOverlay");
     const label = document.getElementById("statusLabel");
     const bar = document.getElementById("progressBar");
-    
     overlay.style.display = "flex";
 
     for (let file of files) {
         try {
             if (file.name.endsWith(".zip")) {
                 const zip = await JSZip.loadAsync(file);
-                const entries = Object.keys(zip.files).filter(name => !zip.files[name].dir);
+                const entries = Object.keys(zip.files).filter(n => !zip.files[n].dir);
                 
                 for (let i = 0; i < entries.length; i++) {
                     const name = entries[i];
-                    const entry = zip.files[name];
                     const shortName = name.split('/').pop();
-                    
-                    label.innerText = `Extraindo: ${shortName}`;
+                    label.innerText = `Lendo: ${shortName}`;
                     bar.style.width = `${((i + 1) / entries.length) * 100}%`;
 
                     if (name.endsWith(".txt")) {
-                        const content = await entry.async("string");
-                        await syncSave("messages", content);
+                        const content = await zip.files[name].async("string");
+                        // 1. Processa o texto fora do banco
+                        const parsedData = parseDataToArray(content);
+                        // 2. Abre a transação rápida só para salvar
+                        await saveMessagesToDB(parsedData);
                     } else {
-                        const blob = await entry.async("blob");
-                        await syncSave("media", { name: shortName, data: blob });
+                        const blob = await zip.files[name].async("blob");
+                        await saveMediaToDB(shortName, blob);
                     }
-                    // Pequena pausa de 5ms para evitar que a transação trave
-                    await new Promise(r => setTimeout(r, 5));
                 }
             } else {
-                label.innerText = `Processando: ${file.name}`;
-                if (file.name.endsWith(".txt")) await syncSave("messages", await file.text());
-                else await syncSave("media", { name: file.name, data: file });
+                if (file.name.endsWith(".txt")) {
+                    const parsedData = parseDataToArray(await file.text());
+                    await saveMessagesToDB(parsedData);
+                } else {
+                    await saveMediaToDB(file.name, file);
+                }
             }
         } catch (err) {
-            console.error("Erro no arquivo:", file.name, err);
+            console.error("Erro no processamento:", err);
             document.getElementById("errorLabel").innerText = "Erro: " + err.message;
             document.getElementById("errorLabel").style.display = "block";
         }
     }
-    
-    label.innerText = "Concluído! Atualizando...";
-    setTimeout(() => {
-        overlay.style.display = "none";
-        loadHistory();
-    }, 1500);
+    overlay.style.display = "none";
+    loadHistory();
 };
 
-// SALVAMENTO SINCRONIZADO (Garante que a transação só abra quando houver dado pronto)
-function syncSave(type, payload) {
-    return new Promise((resolve, reject) => {
-        // Abrimos a transação EXATAMENTE na hora de salvar
-        const tx = db.transaction([type], "readwrite");
-        const store = tx.objectStore(type);
+// Converte texto em Array de objetos antes de tocar no banco
+function parseDataToArray(content) {
+    const results = [];
+    const linhas = content.replace(/[\u200B-\u200D\uFEFF]/g, "").split("\n");
+    const regex = /^\[?(\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4})[,\s]+(\d{1,2}[:\.]\d{2}(?::\d{2})?)\]?\s?[\-]?\s?([^:]+):\s(.+)$/;
 
-        if (type === "messages") {
-            const linhas = payload.replace(/[\u200B-\u200D\uFEFF]/g, "").split("\n");
-            const regex = /^\[?(\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4})[,\s]+(\d{1,2}[:\.]\d{2}(?::\d{2})?)\]?\s?[\-]?\s?([^:]+):\s(.+)$/;
-
-            linhas.forEach(l => {
-                const match = l.match(regex);
-                if (match) {
-                    const [_, data, hora, remetente, texto] = match;
-                    const dParts = data.split(/[\/\-]/);
-                    let ano = dParts[2].length === 2 ? "20" + dParts[2] : dParts[2];
-                    if (dParts[0].length === 4) ano = dParts[0];
-                    const dia = dParts[0].length === 4 ? dParts[2] : dParts[0];
-                    const mes = dParts[1];
-                    const ts = new Date(ano, mes - 1, dia, hora.split(/[:\.]/)[0], hora.split(/[:\.]/)[1]).getTime();
-                    const hash = `${ts}_${remetente.trim()}_${texto.trim()}`;
-                    try { store.add({ sender: remetente.trim(), text: texto.trim(), ts: ts || Date.now(), hash: hash }); } catch(e) {}
-                }
-            });
-        } else {
-            store.put(payload);
+    linhas.forEach(l => {
+        const match = l.match(regex);
+        if (match) {
+            const [_, data, hora, remetente, texto] = match;
+            const dParts = data.split(/[\/\-]/);
+            let ano = dParts[2].length === 2 ? "20" + dParts[2] : dParts[2];
+            if (dParts[0].length === 4) ano = dParts[0];
+            const dia = dParts[0].length === 4 ? dParts[2] : dParts[0];
+            const mes = dParts[1];
+            const ts = new Date(ano, mes - 1, dia, hora.split(/[:\.]/)[0], hora.split(/[:\.]/)[1]).getTime();
+            results.push({ sender: remetente.trim(), text: texto.trim(), ts: ts || Date.now(), hash: `${ts}_${remetente}_${texto}` });
         }
+    });
+    return results;
+}
 
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+// Salva as mensagens de uma vez só em uma transação limpa
+function saveMessagesToDB(dataList) {
+    return new Promise((resolve) => {
+        const transaction = db.transaction(["messages"], "readwrite");
+        const store = transaction.objectStore("messages");
+        dataList.forEach(item => { try { store.add(item); } catch(e) {} });
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => resolve(); // Resolve mesmo com erro de duplicata
     });
 }
 
-// Renderização, Filtros e Clear (mantenha os mesmos das versões anteriores)
+function saveMediaToDB(name, blob) {
+    return new Promise((resolve) => {
+        const transaction = db.transaction(["media"], "readwrite");
+        const store = transaction.objectStore("media");
+        store.put({ name: name, data: blob });
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => resolve();
+    });
+}
+
+// Reutilize as funções renderMessages, filterMessages e clearHistory anteriores.
 function renderMessages(list) {
     const container = document.getElementById("messages");
     container.innerHTML = "";
