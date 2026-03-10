@@ -1,127 +1,85 @@
 let db;
 let allMessages = [];
+let mediaCache = new Map();
 
-// Garante que o navegador não apague os dados por falta de espaço
-if (navigator.storage && navigator.storage.persist) {
-    navigator.storage.persist();
-}
-
-const request = indexedDB.open("WhatsAppHistoryDB", 6);
-
+const request = indexedDB.open("WhatsAppHistoryDB", 10);
 request.onupgradeneeded = e => {
     db = e.target.result;
     if (!db.objectStoreNames.contains("messages")) {
-        const msgStore = db.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
-        msgStore.createIndex("hash", "hash", { unique: true });
+        const store = db.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
+        store.createIndex("hash", "hash", { unique: true });
     }
-    if (!db.objectStoreNames.contains("media")) {
-        db.createObjectStore("media", { keyPath: "name" });
-    }
+    if (!db.objectStoreNames.contains("media")) db.createObjectStore("media", { keyPath: "name" });
 };
 
-request.onsuccess = e => {
-    db = e.target.result;
-    loadHistory();
-};
+request.onsuccess = e => { db = e.target.result; loadHistory(); };
 
 async function loadHistory() {
-    const transaction = db.transaction(["messages"], "readonly");
-    const store = transaction.objectStore("messages");
-    const req = store.getAll();
-
-    req.onsuccess = () => {
-        allMessages = req.result.sort((a, b) => a.ts - b.ts);
-        document.getElementById("stats").innerText = `(${allMessages.length} mensagens)`;
-        renderMessages(allMessages.slice(-500)); // Mostra as 500 mais recentes por padrão
-    };
+    const tx = db.transaction(["messages", "media"], "readonly");
+    const msgs = await new Promise(res => tx.objectStore("messages").getAll().onsuccess = e => res(e.target.result));
+    const medias = await new Promise(res => tx.objectStore("media").getAll().onsuccess = e => res(e.target.result));
+    
+    medias.forEach(m => mediaCache.set(m.name, URL.createObjectURL(m.data)));
+    allMessages = msgs.sort((a, b) => a.ts - b.ts);
+    document.getElementById("stats").innerText = `(${allMessages.length})`;
+    renderMessages(allMessages.slice(-300)); // Renderiza as últimas 300 para ser instantâneo
 }
 
 function renderMessages(list) {
     const container = document.getElementById("messages");
     container.innerHTML = "";
-    if (list.length === 0) return;
-
     const fragment = document.createDocumentFragment();
+
     list.forEach(m => {
         const div = document.createElement("div");
         div.className = "msg";
-        
-        let mediaPlaceholder = "";
-        // Detecta se a mensagem é um nome de arquivo de mídia
-        if (m.text.match(/\.(jpg|jpeg|png|webp|gif|mp4|opus|mp3|m4a|ogg)$/i)) {
-            mediaPlaceholder = `<div id="media-container-${m.id}">
-                <button class="media-btn" onclick="loadMedia('${m.text.trim()}', ${m.id})">📁 Carregar Mídia</button>
-            </div>`;
+        let mediaHtml = "";
+        const fileName = m.text.trim();
+
+        if (mediaCache.has(fileName)) {
+            const url = mediaCache.get(fileName);
+            if (fileName.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mediaHtml = `<div class="media-container"><img src="${url}" loading="lazy"></div>`;
+            else if (fileName.match(/\.(mp4|webm)$/i)) mediaHtml = `<div class="media-container"><video src="${url}" controls></video></div>`;
+            else if (fileName.match(/\.(opus|mp3|m4a|ogg)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
         }
 
-        div.innerHTML = `
-            <div class="sender">${m.sender}</div>
-            <div>${m.text}</div>
-            ${mediaPlaceholder}
-            <div class="time">${new Date(m.ts).toLocaleString()}</div>
-        `;
+        div.innerHTML = `<div class="sender">${m.sender}</div><div>${m.text}</div>${mediaHtml}<div class="time">${new Date(m.ts).toLocaleString()}</div>`;
         fragment.appendChild(div);
     });
     container.appendChild(fragment);
     container.scrollTop = container.scrollHeight;
 }
 
-async function loadMedia(fileName, msgId) {
-    const tx = db.transaction("media", "readonly");
-    const req = tx.objectStore("media").get(fileName);
-    const container = document.getElementById(`media-container-${msgId}`);
-
-    req.onsuccess = () => {
-        if (req.result) {
-            const url = URL.createObjectURL(req.result.data);
-            if (fileName.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
-                container.innerHTML = `<div class="media-content"><img src="${url}"></div>`;
-            } else if (fileName.match(/\.(mp4|webm)$/i)) {
-                container.innerHTML = `<div class="media-content"><video src="${url}" controls></video></div>`;
-            } else {
-                container.innerHTML = `<audio src="${url}" controls></audio>`;
-            }
-        } else {
-            container.innerHTML = `<small style="color:red">Arquivo não encontrado no histórico.</small>`;
-        }
-    };
-}
-
 const processFiles = async (files) => {
     document.getElementById("loadingBarContainer").style.display = "block";
     const bar = document.getElementById("loadingBar");
-    
+    const tx = db.transaction(["messages", "media"], "readwrite");
+    const msgStore = tx.objectStore("messages");
+    const mediaStore = tx.objectStore("media");
+
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         bar.style.width = `${((i + 1) / files.length) * 100}%`;
-
-        const tx = db.transaction(["messages", "media"], "readwrite");
-        const msgStore = tx.objectStore("messages");
-        const mediaStore = tx.objectStore("media");
 
         if (file.name.endsWith(".zip")) {
             const zip = await JSZip.loadAsync(file);
             for (let name in zip.files) {
                 const entry = zip.files[name];
                 if (entry.dir) continue;
-                const fileName = name.split('/').pop();
-                if (name.endsWith(".txt")) {
-                    parseLines(await entry.async("string"), msgStore);
-                } else {
-                    const blob = await entry.async("blob");
-                    mediaStore.put({ name: fileName, data: blob });
-                }
+                const shortName = name.split('/').pop();
+                if (name.endsWith(".txt")) parseLines(await entry.async("string"), msgStore);
+                else mediaStore.put({ name: shortName, data: await entry.async("blob") });
             }
         } else if (file.name.endsWith(".txt")) {
             parseLines(await file.text(), msgStore);
         } else {
             mediaStore.put({ name: file.name, data: file });
         }
-        await new Promise(res => tx.oncomplete = res);
     }
-    
-    document.getElementById("loadingBarContainer").style.display = "none";
-    loadHistory();
+    tx.oncomplete = () => {
+        document.getElementById("loadingBarContainer").style.display = "none";
+        loadHistory();
+    };
 };
 
 function parseLines(t, store) {
@@ -139,11 +97,14 @@ function parseLines(t, store) {
     });
 }
 
+// Eventos
+document.getElementById("fileInput").addEventListener("change", e => processFiles(e.target.files));
+document.getElementById("folderInput").addEventListener("change", e => processFiles(e.target.files));
+
 function filterMessages() {
     const term = document.getElementById("searchInput").value.toLowerCase();
-    if (term.length < 2) { loadHistory(); return; }
-    const filtered = allMessages.filter(m => m.text.toLowerCase().includes(term) || m.sender.toLowerCase().includes(term));
-    renderMessages(filtered);
+    const filtered = allMessages.filter(m => m.text.toLowerCase().includes(term));
+    renderMessages(filtered.slice(-500));
 }
 
 function filterByDate() {
@@ -151,18 +112,12 @@ function filterByDate() {
     if (!val) return;
     const start = new Date(val + "T00:00:00").getTime();
     const end = start + 86400000;
-    const filtered = allMessages.filter(m => m.ts >= start && m.ts < end);
-    renderMessages(filtered);
+    renderMessages(allMessages.filter(m => m.ts >= start && m.ts < end));
 }
 
 function clearHistory() {
-    if (confirm("Apagar todos os dados permanentemente?")) {
-        const tx = db.transaction(["messages", "media"], "readwrite");
-        tx.objectStore("messages").clear();
-        tx.objectStore("media").clear();
-        tx.oncomplete = () => location.reload();
+    if (confirm("Apagar tudo?")) {
+        indexedDB.deleteDatabase("WhatsAppHistoryDB");
+        location.reload();
     }
 }
-
-document.getElementById("fileInput").addEventListener("change", e => processFiles(e.target.files));
-document.getElementById("folderInput").addEventListener("change", e => processFiles(e.target.files));
