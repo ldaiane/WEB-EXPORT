@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chat Viewer Ultra Speed</title>
+    <title>Chat Viewer Ultra - 20GB</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#075e54">
     <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
     <header>
         <div class="top-bar">
-            <div class="brand">Web Chat <small id="stats"></small></div>
-            <button onclick="clearHistory()" class="btn-clear">Limpar</button>
+            <div class="brand">Chat View <small id="stats"></small></div>
+            <button onclick="clearHistory()" class="btn-clear">Limpar Tudo</button>
         </div>
         <div class="controls">
             <div class="search-box">
@@ -18,19 +20,21 @@
                 <input type="date" id="dateFilter" onchange="filterByDate()">
             </div>
             <div class="import-box">
-                <label for="fileInput" class="btn-import">📄 Importar ZIP/TXT/Mídias</label>
-                <input type="file" id="fileInput" multiple accept=".txt,.zip,.jpg,.jpeg,.png,.mp4,.opus,.mp3,.m4a" style="display: none;">
+                <label for="fileInput" class="btn-import">📄 Selecionar Arquivos/ZIP</label>
+                <input type="file" id="fileInput" multiple style="display: none;">
                 <label for="folderInput" class="btn-import hide-mobile">📂 Pasta</label>
                 <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
             </div>
         </div>
     </header>
 
-    <div id="loadingBarContainer"><div id="loadingBar"></div></div>
+    <div id="loadingBarContainer" style="display:none; background:#ccc; height:5px; width:100%;">
+        <div id="loadingBar" style="height:100%; background:#25d366; width:0%; transition: 0.1s;"></div>
+    </div>
 
     <main id="chatView">
         <div id="messages">
-            <div class="welcome-msg">Importe arquivos. Mídias aparecerão automaticamente.</div>
+            <div class="welcome-msg">Selecione o arquivo .txt ou .zip para carregar.</div>
         </div>
     </main>
 
