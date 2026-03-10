@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WhatsApp Viewer Fix</title>
+    <title>WhatsApp Ultra Viewer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root { --wa-green: #128C7E; --wa-bg: #e5ddd5; }
         body { font-family: sans-serif; margin: 0; background: var(--wa-bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         header { background: var(--wa-green); color: white; padding: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .row { display: flex; justify-content: space-between; align-items: center; }
-        button, .btn-import { background: #25d366; border: none; color: white; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; text-align: center; }
-        input[type="text"] { flex: 1; padding: 10px; border-radius: 5px; border: none; font-size: 16px; }
+        button, .btn-import { background: #25d366; border: none; color: white; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; text-align: center; width: 100%; display: block; }
+        input[type="text"] { flex: 1; padding: 10px; border-radius: 5px; border: none; font-size: 16px; margin-right: 5px; }
         #chatView { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
-        .msg { background: white; padding: 12px; border-radius: 10px; margin-bottom: 10px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .msg { background: white; padding: 12px; border-radius: 10px; margin-bottom: 10px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.1); border-left: 4px solid var(--wa-green); }
         .sender { font-weight: bold; color: #075e54; font-size: 12px; margin-bottom: 4px; }
         .text { font-size: 15px; color: #333; word-wrap: break-word; }
         .time { font-size: 10px; color: #999; text-align: right; margin-top: 5px; }
@@ -31,13 +31,13 @@
     <header>
         <div class="row">
             <div style="font-weight: bold;">WA Viewer <span id="stats"></span></div>
-            <button onclick="clearHistory()" style="background:#d9534f">Limpar</button>
+            <button onclick="clearHistory()" style="background:#d9534f; width: auto; padding: 5px 10px;">Limpar Tudo</button>
         </div>
-        <div class="row" style="gap:5px;">
-            <input type="text" id="searchInput" placeholder="Pesquisar...">
-            <button onclick="searchMessages()">🔍</button>
+        <div class="row">
+            <input type="text" id="searchInput" placeholder="Pesquisar conversa...">
+            <button onclick="searchMessages()" style="width: auto;">🔍</button>
         </div>
-        <label for="fileInput" class="btn-import">📂 SELECIONAR ZIP (20GB)</label>
+        <label for="fileInput" class="btn-import">📂 SELECIONAR ZIP DE 20GB</label>
         <input type="file" id="fileInput" multiple style="display: none;">
     </header>
 
@@ -51,7 +51,8 @@
 
     <script>
         let db;
-        const request = indexedDB.open("WhatsAppDB", 5); // Versão aumentada para resetar índices
+        // Versão 10 para forçar reset total de qualquer lixo anterior
+        const request = indexedDB.open("WhatsAppDB", 10);
         
         request.onupgradeneeded = e => {
             let d = e.target.result;
@@ -66,30 +67,42 @@
         async function loadHistory() {
             if (!db) return;
             const tx = db.transaction(["messages"], "readonly");
-            tx.objectStore("messages").getAll().onsuccess = e => {
+            tx.objectStore("messages").getAll().onsuccess = async e => {
                 const msgs = e.target.result.sort((a, b) => a.ts - b.ts);
                 document.getElementById("stats").innerText = `(${msgs.length})`;
-                render(msgs.slice(-200)); 
+                await render(msgs.slice(-150)); 
             };
         }
 
         async function render(list) {
             const container = document.getElementById("messages");
             container.innerHTML = "";
+            
+            // Carrega todos os nomes de mídias para busca rápida
+            const mediaKeys = await new Promise(r => {
+                const tx = db.transaction("media", "readonly");
+                tx.objectStore("media").getAllKeys().onsuccess = ev => r(ev.target.result);
+            });
+
             for (let m of list) {
                 const div = document.createElement("div");
                 div.className = "msg";
-                const cleanText = m.text.trim();
-                
-                // Busca automática de mídia pelo nome do arquivo
+                const txt = m.text.toLowerCase();
                 let mediaHtml = "";
-                if (cleanText.includes(".")) {
-                    const blob = await getMedia(cleanText);
+
+                // BUSCA INTELIGENTE: Vê se o texto da mensagem cita algum arquivo que temos no banco
+                const foundMediaName = mediaKeys.find(key => 
+                    txt.includes(key.toLowerCase().split('.')[0]) || // Busca pelo nome sem extensão
+                    key.toLowerCase().includes(txt.split(' ')[0])   // Busca inversa
+                );
+
+                if (foundMediaName) {
+                    const blob = await getMedia(foundMediaName);
                     if (blob) {
                         const url = URL.createObjectURL(blob);
-                        if (cleanText.match(/\.(jpg|jpeg|png|webp)$/i)) mediaHtml = `<img src="${url}">`;
-                        else if (cleanText.match(/\.(mp4|webm)$/i)) mediaHtml = `<video src="${url}" controls></video>`;
-                        else if (cleanText.match(/\.(opus|mp3|m4a|ogg)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
+                        if (foundMediaName.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mediaHtml = `<img src="${url}">`;
+                        else if (foundMediaName.match(/\.(mp4|webm|3gp)$/i)) mediaHtml = `<video src="${url}" controls></video>`;
+                        else if (foundMediaName.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
                     }
                 }
 
@@ -114,33 +127,35 @@
             for (let file of files) {
                 const zip = await JSZip.loadAsync(file);
                 const entries = Object.keys(zip.files).filter(n => !zip.files[n].dir);
-                
-                for (let i = 0; i < entries.length; i++) {
-                    const name = entries[i];
-                    const shortName = name.split('/').pop();
-                    document.getElementById("progress").style.width = `${((i+1)/entries.length)*100}%`;
-                    document.getElementById("statusLabel").innerText = `Salvando: ${shortName}`;
+                const total = entries.length;
 
-                    if (name.endsWith(".txt")) {
-                        const txt = await zip.files[name].async("string");
-                        await saveMsgs(parse(txt));
+                for (let i = 0; i < total; i++) {
+                    const path = entries[i];
+                    const fileName = path.split('/').pop();
+                    document.getElementById("progress").style.width = `${((i+1)/total)*100}%`;
+                    document.getElementById("statusLabel").innerText = `Lendo: ${fileName}`;
+
+                    if (path.toLowerCase().endsWith(".txt")) {
+                        const content = await zip.files[path].async("string");
+                        await saveMsgs(parse(content));
                     } else {
-                        const blob = await zip.files[name].async("blob");
-                        await saveMedia(shortName, blob);
+                        const blob = await zip.files[path].async("blob");
+                        await saveMedia(fileName, blob);
                     }
-                    if (i % 50 === 0) await new Promise(r => setTimeout(r, 5));
+                    if (i % 40 === 0) await new Promise(r => setTimeout(r, 2));
                 }
             }
             location.reload();
         };
 
         function parse(content) {
-            const regex = /(\d{2}\/\d{2}\/\d{2,4}).*?-\s([^:]+):\s(.+)/;
+            // Suporta formatos de data: DD/MM/YY ou [DD/MM/YY] ou DD-MM-YYYY
+            const regex = /\[?(\d{2}[\/\-]\d{2}[\/\-]\d{2,4}).*?\]?[\s-]*?([^:]+):\s(.+)/;
             return content.split("\n").map(l => {
                 const m = l.match(regex);
                 if (m) {
-                    let text = m[3].replace("<Arquivo anexado: ", "").replace(">", "").trim();
-                    return { dataStr: m[1], sender: m[2], text: text, ts: Date.now() };
+                    let rawText = m[3].replace(/<Arquivo anexado:\s?|>/gi, "").trim();
+                    return { dataStr: m[1], sender: m[2], text: rawText, ts: Date.now() };
                 }
                 return null;
             }).filter(x => x);
@@ -157,13 +172,13 @@
         function saveMedia(name, blob) {
             return new Promise(r => {
                 const tx = db.transaction("media", "readwrite");
-                tx.objectStore("media").put({ name: name, data: blob });
+                tx.objectStore("media").put({ name, data: blob });
                 tx.oncomplete = () => r();
             });
         }
 
         function clearHistory() {
-            if(confirm("Apagar tudo?")) {
+            if(confirm("Isso apagará os 20GB salvos. Tem certeza?")) {
                 indexedDB.deleteDatabase("WhatsAppDB");
                 location.reload();
             }
