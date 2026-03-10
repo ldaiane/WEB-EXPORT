@@ -1,90 +1,99 @@
 let db;
 let allMessages = [];
 
-// 1. SOLICITA PERMISSÃO PARA ARMAZENAR GBs SEM APAGAR
+// Garante que o navegador não apague os dados por falta de espaço
 if (navigator.storage && navigator.storage.persist) {
-    navigator.storage.persist().then(persistent => {
-        if (persistent) console.log("Armazenamento persistente garantido!");
-    });
+    navigator.storage.persist();
 }
 
-const request = indexedDB.open("WhatsAppHistoryDB", 5);
+const request = indexedDB.open("WhatsAppHistoryDB", 6);
+
 request.onupgradeneeded = e => {
     db = e.target.result;
     if (!db.objectStoreNames.contains("messages")) {
         const msgStore = db.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
         msgStore.createIndex("hash", "hash", { unique: true });
     }
-    if (!db.objectStoreNames.contains("media")) db.createObjectStore("media", { keyPath: "name" });
+    if (!db.objectStoreNames.contains("media")) {
+        db.createObjectStore("media", { keyPath: "name" });
+    }
 };
 
-request.onsuccess = e => { db = e.target.result; loadHistory(); };
+request.onsuccess = e => {
+    db = e.target.result;
+    loadHistory();
+};
 
 async function loadHistory() {
     const transaction = db.transaction(["messages"], "readonly");
     const store = transaction.objectStore("messages");
-    const request = store.getAll();
+    const req = store.getAll();
 
-    request.onsuccess = () => {
-        allMessages = request.result.sort((a, b) => a.ts - b.ts);
-        document.getElementById("stats").innerText = `(${allMessages.length} msgs)`;
-        renderMessages(allMessages);
+    req.onsuccess = () => {
+        allMessages = req.result.sort((a, b) => a.ts - b.ts);
+        document.getElementById("stats").innerText = `(${allMessages.length} mensagens)`;
+        renderMessages(allMessages.slice(-500)); // Mostra as 500 mais recentes por padrão
     };
 }
 
-// Renderização otimizada para milhares de itens
-async function renderMessages(list) {
+function renderMessages(list) {
     const container = document.getElementById("messages");
     container.innerHTML = "";
     if (list.length === 0) return;
 
-    // Carregamos apenas as últimas 500 mensagens inicialmente para não travar o celular
-    // O restante aparece ao pesquisar ou se necessário
-    const recentMessages = list.slice(-500); 
-
     const fragment = document.createDocumentFragment();
-    for (const m of recentMessages) {
+    list.forEach(m => {
         const div = document.createElement("div");
         div.className = "msg";
         
-        // Carregamento de mídia sob demanda para economizar RAM
-        let mediaHtml = "";
-        if (m.text.match(/\.(jpg|jpeg|png|webp|gif|mp4|opus|mp3)$/i)) {
-            mediaHtml = `<button onclick="loadMedia('${m.text.trim()}', this)" class="btn-import" style="margin-top:5px">Ver Mídia</button>`;
+        let mediaPlaceholder = "";
+        // Detecta se a mensagem é um nome de arquivo de mídia
+        if (m.text.match(/\.(jpg|jpeg|png|webp|gif|mp4|opus|mp3|m4a|ogg)$/i)) {
+            mediaPlaceholder = `<div id="media-container-${m.id}">
+                <button class="media-btn" onclick="loadMedia('${m.text.trim()}', ${m.id})">📁 Carregar Mídia</button>
+            </div>`;
         }
 
-        div.innerHTML = `<div class="sender">${m.sender}</div><div>${m.text}</div><div id="media-${m.id}">${mediaHtml}</div><div class="time">${new Date(m.ts).toLocaleString()}</div>`;
+        div.innerHTML = `
+            <div class="sender">${m.sender}</div>
+            <div>${m.text}</div>
+            ${mediaPlaceholder}
+            <div class="time">${new Date(m.ts).toLocaleString()}</div>
+        `;
         fragment.appendChild(div);
-    }
+    });
     container.appendChild(fragment);
     container.scrollTop = container.scrollHeight;
 }
 
-// Busca a mídia no DB apenas quando o usuário clica
-async function loadMedia(name, btn) {
+async function loadMedia(fileName, msgId) {
     const tx = db.transaction("media", "readonly");
-    const req = tx.objectStore("media").get(name);
+    const req = tx.objectStore("media").get(fileName);
+    const container = document.getElementById(`media-container-${msgId}`);
+
     req.onsuccess = () => {
         if (req.result) {
             const url = URL.createObjectURL(req.result.data);
-            const parent = btn.parentElement;
-            if (name.match(/\.(jpg|jpeg|png|webp|gif)$/i)) parent.innerHTML = `<img src="${url}" style="max-width:100%">`;
-            else if (name.match(/\.(mp4|webm)$/i)) parent.innerHTML = `<video src="${url}" controls style="max-width:100%"></video>`;
-            else parent.innerHTML = `<audio src="${url}" controls></audio>`;
+            if (fileName.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+                container.innerHTML = `<div class="media-content"><img src="${url}"></div>`;
+            } else if (fileName.match(/\.(mp4|webm)$/i)) {
+                container.innerHTML = `<div class="media-content"><video src="${url}" controls></video></div>`;
+            } else {
+                container.innerHTML = `<audio src="${url}" controls></audio>`;
+            }
         } else {
-            btn.innerText = "Arquivo não encontrado";
+            container.innerHTML = `<small style="color:red">Arquivo não encontrado no histórico.</small>`;
         }
     };
 }
 
 const processFiles = async (files) => {
-    const loader = document.getElementById("loadingBar");
-    loader.style.display = "block";
-    let processed = 0;
-
-    for (let file of files) {
-        processed++;
-        loader.style.width = `${(processed / files.length) * 100}%`;
+    document.getElementById("loadingBarContainer").style.display = "block";
+    const bar = document.getElementById("loadingBar");
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        bar.style.width = `${((i + 1) / files.length) * 100}%`;
 
         const tx = db.transaction(["messages", "media"], "readwrite");
         const msgStore = tx.objectStore("messages");
@@ -93,11 +102,14 @@ const processFiles = async (files) => {
         if (file.name.endsWith(".zip")) {
             const zip = await JSZip.loadAsync(file);
             for (let name in zip.files) {
-                if (name.endsWith(".txt") && !zip.files[name].dir) {
-                    parseLines(await zip.files[name].async("string"), msgStore);
-                } else if (!zip.files[name].dir) {
+                const entry = zip.files[name];
+                if (entry.dir) continue;
+                const fileName = name.split('/').pop();
+                if (name.endsWith(".txt")) {
+                    parseLines(await entry.async("string"), msgStore);
+                } else {
                     const blob = await entry.async("blob");
-                    mediaStore.put({ name: name.split('/').pop(), data: blob });
+                    mediaStore.put({ name: fileName, data: blob });
                 }
             }
         } else if (file.name.endsWith(".txt")) {
@@ -107,7 +119,8 @@ const processFiles = async (files) => {
         }
         await new Promise(res => tx.oncomplete = res);
     }
-    loader.style.display = "none";
+    
+    document.getElementById("loadingBarContainer").style.display = "none";
     loadHistory();
 };
 
@@ -128,15 +141,26 @@ function parseLines(t, store) {
 
 function filterMessages() {
     const term = document.getElementById("searchInput").value.toLowerCase();
-    if (term.length < 3) return; // Só busca com 3+ letras para não travar em 20GB
-    const filtered = allMessages.filter(m => m.text.toLowerCase().includes(term));
+    if (term.length < 2) { loadHistory(); return; }
+    const filtered = allMessages.filter(m => m.text.toLowerCase().includes(term) || m.sender.toLowerCase().includes(term));
+    renderMessages(filtered);
+}
+
+function filterByDate() {
+    const val = document.getElementById("dateFilter").value;
+    if (!val) return;
+    const start = new Date(val + "T00:00:00").getTime();
+    const end = start + 86400000;
+    const filtered = allMessages.filter(m => m.ts >= start && m.ts < end);
     renderMessages(filtered);
 }
 
 function clearHistory() {
-    if (confirm("Apagar 20GB de dados?")) {
-        indexedDB.deleteDatabase("WhatsAppHistoryDB");
-        location.reload();
+    if (confirm("Apagar todos os dados permanentemente?")) {
+        const tx = db.transaction(["messages", "media"], "readwrite");
+        tx.objectStore("messages").clear();
+        tx.objectStore("media").clear();
+        tx.oncomplete = () => location.reload();
     }
 }
 
