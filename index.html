@@ -3,25 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chat Viewer Multiplataforma</title>
+    <title>Chat Viewer Ultra Speed</title>
     <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
     <header>
         <div class="top-bar">
-            <div class="brand">Chat View <small id="stats"></small></div>
+            <div class="brand">Web Chat <small id="stats"></small></div>
             <button onclick="clearHistory()" class="btn-clear">Limpar</button>
         </div>
-        
         <div class="controls">
             <div class="search-box">
                 <input type="text" id="searchInput" placeholder="🔍 Buscar..." oninput="filterMessages()">
                 <input type="date" id="dateFilter" onchange="filterByDate()">
             </div>
             <div class="import-box">
-                <label for="fileInput" class="btn-import">📄 ZIP/TXT</label>
-                <input type="file" id="fileInput" multiple accept=".txt,.zip" style="display: none;">
-                
+                <label for="fileInput" class="btn-import">📄 Importar ZIP/TXT/Mídias</label>
+                <input type="file" id="fileInput" multiple accept=".txt,.zip,.jpg,.jpeg,.png,.mp4,.opus,.mp3,.m4a" style="display: none;">
                 <label for="folderInput" class="btn-import hide-mobile">📂 Pasta</label>
                 <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
             </div>
@@ -32,7 +30,7 @@
 
     <main id="chatView">
         <div id="messages">
-            <div class="welcome-msg">Importe seus arquivos para começar.</div>
+            <div class="welcome-msg">Importe arquivos. Mídias aparecerão automaticamente.</div>
         </div>
     </main>
 
