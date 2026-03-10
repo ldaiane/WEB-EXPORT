@@ -2,232 +2,92 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WA MASTER RECOVERY</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <title>WhatsApp Multi-ZIP Viewer</title>
+    <script src="https://cdnjs.cloudflare.com"></script>
     <style>
-        :root { --wa-green: #075e54; --wa-teal: #128c7e; --wa-light: #25d366; }
-        * { box-sizing: border-box; font-family: -apple-system, sans-serif; }
-        body { margin: 0; background: #d1d7db; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        header { background: var(--wa-green); color: white; padding: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-        .tabs { display: flex; background: var(--wa-green); }
-        .tab { flex: 1; padding: 15px; text-align: center; font-weight: bold; color: rgba(255,255,255,0.6); cursor: pointer; border-bottom: 3px solid transparent; }
-        .tab.active { color: white; border-bottom-color: white; }
-
-        .controls { background: #f0f2f5; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #ccc; }
-        .import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .btn-opt { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; text-align: center; }
-        .btn-zip { background: var(--wa-teal); }
-        .btn-folder { background: var(--wa-green); }
-
-        main { flex: 1; overflow-y: auto; background: #e5ddd5; position: relative; }
-        #chat-view { padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        
-        .msg { background: white; padding: 10px; border-radius: 8px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-        .msg.me { align-self: flex-end; background: #dcf8c6; }
-        .sender { font-weight: bold; color: var(--wa-teal); font-size: 11px; margin-bottom: 3px; display: block; }
-        .text { font-size: 14px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
-        .time { font-size: 10px; color: #667781; text-align: right; margin-top: 5px; }
-
-        .m-content { margin-top: 8px; border-radius: 4px; overflow: hidden; border: 1px solid #ddd; }
-        img, video { max-width: 100%; display: block; }
-        audio { width: 100%; margin-top: 5px; }
-        .pdf-box { display: flex; align-items: center; gap: 10px; padding: 10px; background: #fff; border: 1px solid #ff5722; border-radius: 5px; cursor: pointer; text-decoration: none; color: #333; font-weight: bold; font-size: 12px; }
-
-        #loader { position: fixed; inset: 0; background: white; z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 30px; }
-        .bar-wrap { width: 100%; background: #eee; height: 15px; border-radius: 10px; margin: 20px 0; overflow: hidden; }
-        #bar { background: var(--wa-light); width: 0%; height: 100%; transition: 0.2s; }
+        body { font-family: 'Segoe UI', sans-serif; background: #efe7dd; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #075e54; color: white; padding: 15px; text-align: center; font-weight: bold; }
+        #drop-zone { background: white; margin: 20px; padding: 40px; border: 3px dashed #075e54; border-radius: 15px; text-align: center; cursor: pointer; }
+        #chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
+        .msg { background: white; margin: 6px 0; padding: 12px; border-radius: 10px; max-width: 85%; box-shadow: 0 1px 2px rgba(0,0,0,0.1); align-self: flex-start; }
+        img, video { max-width: 100%; border-radius: 8px; margin-top: 10px; display: block; }
+        audio { width: 100%; margin-top: 10px; }
+        .btn-gerar { background: #25d366; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; cursor: pointer; margin: 10px; display: none; }
     </style>
 </head>
 <body>
 
-    <header>
-        <span style="font-weight:bold;">WA Recovery Pro</span>
-        <button onclick="resetDB()" style="background:#ea4335; color:white; border:none; padding:5px 10px; border-radius:4px;">Zerar</button>
-    </header>
+<header>EXTRAIR WHATSAPP (MULTI-ZIP)</header>
 
-    <div class="tabs">
-        <div class="tab active" id="tab-msgs" onclick="showTab('chat')">Conversas</div>
-        <div class="tab" id="tab-gallery" onclick="showTab('gallery')">Galeria</div>
-    </div>
+<div id="drop-zone">
+    <strong>CLIQUE PARA SELECIONAR UM OU VÁRIOS ZIPS</strong>
+    <input type="file" id="file-input" accept=".zip" multiple style="display:none">
+</div>
 
-    <div class="controls">
-        <div class="import-grid">
-            <label for="f-zip" class="btn-opt btn-zip">📦 ZIP / TXT</label>
-            <label for="f-folder" class="btn-opt btn-folder">📁 PASTA MÍDIA</label>
-        </div>
-        <input type="file" id="f-zip" multiple style="display: none;">
-        <input type="file" id="f-folder" webkitdirectory directory style="display: none;">
-        <input type="text" id="search" placeholder="🔍 Pesquisar..." onkeyup="renderChat(this.value)" style="padding:12px; border-radius:8px; border:1px solid #ccc;">
-    </div>
+<center><button id="btn-gerar" class="btn-gerar">GERAR CONVERSA UNIFICADA</button></center>
 
-    <main id="scroll-area">
-        <div id="chat-view"></div>
-    </main>
+<div id="chat"></div>
 
-    <div id="loader">
-        <h2 id="l-title">Lendo Arquivos...</h2>
-        <div class="bar-wrap"><div id="bar"></div></div>
-        <p id="l-info" style="font-weight:bold;"></p>
-        <p>Aguarde, processando banco de dados...</p>
-    </div>
+<script>
+    const fileInput = document.getElementById('file-input');
+    const dropZone = document.getElementById('drop-zone');
+    const btnGerar = document.getElementById('btn-gerar');
+    const chat = document.getElementById('chat');
 
-    <script>
-        let db;
-        const DB_NAME = "WA_FINAL_RECOVERY_V1";
+    let allMessages = new Map();
+    let mediaUrls = new Map();
 
-        const req = indexedDB.open(DB_NAME, 5);
-        req.onupgradeneeded = e => {
-            const d = e.target.result;
-            if(d.objectStoreNames.contains("msgs")) d.deleteObjectStore("msgs");
-            if(d.objectStoreNames.contains("media")) d.deleteObjectStore("media");
-            d.createObjectStore("msgs", { keyPath: "id", autoIncrement: true }).createIndex("ts", "ts");
-            d.createObjectStore("media", { keyPath: "name" });
-        };
-        req.onsuccess = e => { db = e.target.result; renderChat(); };
+    dropZone.onclick = () => fileInput.click();
 
-        async function processFiles(files) {
-            document.getElementById('loader').style.display = 'flex';
-            let stats = { s: 0, m: 0 };
+    fileInput.onchange = async (e) => {
+        const files = e.target.files;
+        if (!files.length) return;
+        btnGerar.style.display = "block";
+        
+        for (const file of files) {
+            const zip = await JSZip.loadAsync(file);
+            for (let path in zip.files) {
+                const entry = zip.files[path];
+                if (entry.dir) continue;
+                const fileName = path.split('/').pop().toLowerCase();
 
-            for (let i = 0; i < files.length; i++) {
-                const f = files[i];
-                document.getElementById('bar').style.width = `${((i+1)/files.length)*100}%`;
-                const name = f.name.split('/').pop();
-
-                if (name.toLowerCase().endsWith('.zip')) {
-                    const zip = await JSZip.loadAsync(f);
-                    for (let path in zip.files) {
-                        const entry = zip.files[path];
-                        if (entry.dir) continue;
-                        const subName = path.split('/').pop();
-                        if (subName.toLowerCase().endsWith('.txt')) {
-                            const res = await saveMsgs(parse(await entry.async("string")));
-                            stats.s += res;
-                        } else {
-                            await saveMedia(subName, await entry.async("blob"));
-                            stats.m++;
-                        }
-                    }
-                } else if (name.toLowerCase().endsWith('.txt')) {
-                    stats.s += await saveMsgs(parse(await f.text()));
-                } else {
-                    await saveMedia(name, f);
-                    stats.m++;
+                if (fileName.endsWith('.txt')) {
+                    const content = await entry.async("string");
+                    content.split('\n').forEach(line => {
+                        if (line.trim().length > 5) allMessages.set(line.trim(), line.trim());
+                    });
+                } else if (fileName.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|m4a|mov)$/i)) {
+                    const blob = await entry.async("blob");
+                    mediaUrls.set(fileName, URL.createObjectURL(blob));
                 }
-                document.getElementById('l-info').innerText = `${stats.s} mensagens / ${stats.m} arquivos`;
-            }
-            document.getElementById('loader').style.display = 'none';
-            renderChat();
-        }
-
-        document.getElementById('f-zip').onchange = e => processFiles(Array.from(e.target.files));
-        document.getElementById('f-folder').onchange = e => processFiles(Array.from(e.target.files));
-
-        function parse(txt) {
-            const regex = /(\d{2})[.\/-](\d{2})[.\/-](\d{2,4}).*?(\d{2}:\d{2}).*?([^:]+):\s(.+)/;
-            return txt.split("\n").map(l => {
-                const m = l.match(regex);
-                if (!m) return null;
-                const d = m[1], mo = m[2], y = m[3].length==2 ? '20'+m[3] : m[3];
-                const ts = new Date(`${y}-${mo}-${d}T${m[4]}:00`).getTime() || 0;
-                return { date: `${d}/${mo}/${y}`, time: m[4], sender: m[5], text: m[6], ts };
-            }).filter(x => x);
-        }
-
-        async function saveMsgs(data) {
-            return new Promise(r => {
-                const tx = db.transaction("msgs", "readwrite");
-                const store = tx.objectStore("msgs");
-                let count = 0;
-                data.forEach(m => { store.add(m).onsuccess = () => count++; });
-                tx.oncomplete = () => r(count);
-            });
-        }
-
-        function saveMedia(name, blob) {
-            const tx = db.transaction("media", "readwrite");
-            tx.objectStore("media").put({ name, data: blob });
-        }
-
-        async function renderChat(f = "") {
-            const view = document.getElementById('chat-view');
-            const tx = db.transaction(["msgs", "media"], "readonly");
-            const mediaKeys = await new Promise(r => tx.objectStore("media").getAllKeys().onsuccess = ev => r(ev.target.result));
-            
-            tx.objectStore("msgs").index("ts").getAll().onsuccess = async e => {
-                let msgs = e.target.result;
-                if(f) msgs = msgs.filter(m => m.text.toLowerCase().includes(f.toLowerCase()));
-                view.innerHTML = "";
-                const frag = document.createDocumentFragment();
-                
-                // Pega as últimas 300 para não travar
-                msgs.slice(-300).forEach(m => {
-                    const div = document.createElement('div');
-                    div.className = `msg ${m.sender.toLowerCase().includes('você')?'me':''}`;
-                    let mHtml = "";
-                    
-                    const cleanText = m.text.toLowerCase();
-                    const found = mediaKeys.find(k => cleanText.includes(k.toLowerCase()));
-
-                    if (found) {
-                        mHtml = `<div id="media-${m.id}" class="m-content">...carregando mídia...</div>`;
-                        loadMediaLazy(found, m.id);
-                    }
-
-                    div.innerHTML = `<span class="sender">${m.sender}</span><div class="text">${m.text}</div>${mHtml}<div class="time">${m.date} ${m.time}</div>`;
-                    frag.appendChild(div);
-                });
-                view.appendChild(frag);
-                document.getElementById('scroll-area').scrollTop = view.scrollHeight;
-            };
-        }
-
-        async function loadMediaLazy(name, msgId) {
-            const tx = db.transaction("media", "readonly");
-            tx.objectStore("media").get(name).onsuccess = e => {
-                const item = e.target.result;
-                if(!item) return;
-                const url = URL.createObjectURL(item.data);
-                const container = document.getElementById(`media-${msgId}`);
-                if(!container) return;
-
-                if (name.match(/\.(jpg|jpeg|png|webp|gif)$/i)) container.innerHTML = `<img src="${url}" onclick="window.open('${url}')">`;
-                else if (name.match(/\.(mp4|webm)$/i)) container.innerHTML = `<video src="${url}" controls></video>`;
-                else if (name.match(/\.(opus|mp3|m4a|wav)$/i)) container.innerHTML = `<audio src="${url}" controls></audio>`;
-                else if (name.match(/\.pdf$/i)) container.innerHTML = `<a href="${url}" target="_blank" class="pdf-box">📕 ABRIR PDF: ${name}</a>`;
-            };
-        }
-
-        function showTab(type) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            if(type === 'chat') {
-                document.getElementById('tab-msgs').classList.add('active');
-                renderChat();
-            } else {
-                document.getElementById('tab-gallery').classList.add('active');
-                renderGallery();
             }
         }
+        alert("Arquivos carregados! Clique em GERAR.");
+    };
 
-        function renderGallery() {
-            const view = document.getElementById('chat-view');
-            view.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;" id="g-grid"></div>';
-            const grid = document.getElementById('g-grid');
-            db.transaction("media").objectStore("media").getAll().onsuccess = e => {
-                e.target.result.forEach(item => {
-                    if (item.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
-                        const img = document.createElement('img');
-                        img.src = URL.createObjectURL(item.data);
-                        img.style.width = "100%";
-                        grid.appendChild(img);
-                    }
-                });
-            };
-        }
-
-        function resetDB() { if(confirm("Apagar TUDO?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } }
-    </script>
+    btnGerar.onclick = () => {
+        chat.innerHTML = "";
+        const sorted = Array.from(allMessages.values()).sort();
+        sorted.forEach(line => {
+            const div = document.createElement('div');
+            div.className = 'msg';
+            const match = line.match(/([\w\-. ]+\.(?:jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov))/i);
+            let mediaHtml = "";
+            if (match) {
+                const name = match[0].trim().toLowerCase();
+                const url = mediaUrls.get(name);
+                if (url) {
+                    if (name.match(/\.(jpg|jpeg|png|webp)$/)) mediaHtml = `<img src="${url}">`;
+                    else if (name.match(/\.(mp3|opus|ogg|m4a)$/)) mediaHtml = `<audio controls src="${url}"></audio>`;
+                    else if (name.match(/\.(mp4|mov)$/)) mediaHtml = `<video controls src="${url}"></video>`;
+                }
+            }
+            div.innerHTML = `<span>${line}</span>${mediaHtml}`;
+            chat.appendChild(div);
+        });
+        dropZone.style.display = "none";
+        btnGerar.style.display = "none";
+    };
+</script>
 </body>
 </html>
