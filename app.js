@@ -1,75 +1,47 @@
-let chats = {};
-let currentChat = null;
+let db;
+let currentChat = "Backup Geral"; // Centraliza em um histórico único
 let mediaStore = {};
 
-const chatList = document.getElementById("chatList");
-const chatView = document.getElementById("chatView");
-const messages = document.getElementById("messages");
-const chatTitle = document.getElementById("chatTitle");
+// Inicializa o Banco de Dados (IndexedDB)
+const request = indexedDB.open("ChatHistoryDB", 1);
+request.onupgradeneeded = e => {
+    db = e.target.result;
+    db.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
+};
+request.onsuccess = e => {
+    db = e.target.result;
+    loadHistory(); // Carrega o que já existe ao abrir o site
+};
+
+// Elementos do DOM
+const messagesContainer = document.getElementById("messages");
 const fileInput = document.getElementById("fileInput");
 
-function randomColor(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    let color = "#";
-    for (let i = 0; i < 3; i++) {
-        let value = (hash >>> (i * 8)) & 255;
-        color += ("00" + value.toString(16)).substr(-2);
-    }
-    return color;
+function loadHistory() {
+    const transaction = db.transaction("messages", "readonly");
+    const store = transaction.objectStore("messages");
+    const request = store.getAll();
+    request.onsuccess = () => {
+        renderMessages(request.result);
+    };
 }
 
-function openChat(name) {
-    currentChat = name;
-    chatList.style.display = "none";
-    chatView.style.display = "flex";
-    chatTitle.innerText = name;
-    renderMessages();
-}
-
-function closeChat() {
-    chatView.style.display = "none";
-    chatList.style.display = "block";
-}
-
-function renderChats() {
-    chatList.innerHTML = "";
-    Object.keys(chats).forEach(c => {
-        let div = document.createElement("div");
-        div.className = "chatItem";
-        div.innerText = c;
-        div.onclick = () => openChat(c);
-        chatList.appendChild(div);
-    });
-}
-
-function renderMessages() {
-    messages.innerHTML = "";
-    let list = chats[currentChat] || [];
+function renderMessages(list) {
+    messagesContainer.innerHTML = "";
+    // Organiza AUTOMATICAMENTE por ordem cronológica
     list.sort((a, b) => a.ts - b.ts);
 
     list.forEach(m => {
-        let div = document.createElement("div");
+        const div = document.createElement("div");
         div.className = "msg";
-        let color = randomColor(m.sender);
-        
-        let media = "";
-        if (m.file && mediaStore[m.file.trim()]) {
-            let url = mediaStore[m.file.trim()];
-            if (m.file.match(/jpg|png|jpeg|gif|webp/i)) media = `<div class="media"><img src="${url}"></div>`;
-            else if (m.file.match(/mp4|webm|mov/i)) media = `<div class="media"><video src="${url}" controls></video></div>`;
-            else if (m.file.match(/mp3|ogg|opus|m4a/i)) media = `<audio src="${url}" controls></audio>`;
-        }
-
         div.innerHTML = `
-            <div class="sender" style="color:${color}">${m.sender}</div>
+            <div class="sender" style="color: #e91e63">${m.sender}</div>
             <div>${m.text}</div>
-            ${media}
-            <div class="time">${new Date(m.ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+            <div class="time">${new Date(m.ts).toLocaleString()}</div>
         `;
-        messages.appendChild(div);
+        messagesContainer.appendChild(div);
     });
-    messages.scrollTop = messages.scrollHeight;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 fileInput.addEventListener("change", async e => {
@@ -77,27 +49,21 @@ fileInput.addEventListener("change", async e => {
         if (file.name.endsWith(".zip")) {
             let zip = await JSZip.loadAsync(file);
             for (let name in zip.files) {
-                let entry = zip.files[name];
-                if (entry.dir) continue;
-                if (name.endsWith(".txt")) {
-                    parseTxt(await entry.async("string"), file.name);
-                } else {
-                    let blob = await entry.async("blob");
-                    mediaStore[name] = URL.createObjectURL(blob);
+                if (!zip.files[name].dir && name.endsWith(".txt")) {
+                    parseAndSave(await zip.files[name].async("string"));
                 }
             }
         } else if (file.name.endsWith(".txt")) {
-            parseTxt(await file.text(), file.name);
+            parseAndSave(await file.text());
         }
     }
-    renderChats();
 });
 
-function parseTxt(t, origin) {
+function parseAndSave(t) {
     const cleanText = t.replace(/[\u200B-\u200D\uFEFF]/g, "");
     let linhas = cleanText.split("\n");
-    let chatName = origin.replace(".txt", "").replace(".zip", "").replace("Conversa do WhatsApp com ", "");
-    if (!chats[chatName]) chats[chatName] = [];
+    const transaction = db.transaction("messages", "readwrite");
+    const store = transaction.objectStore("messages");
 
     linhas.forEach(l => {
         let m = l.match(/^(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}),?\s?(\d{1,2}[:\.]\d{2}).*?-\s(.*?):\s(.*)$/);
@@ -106,7 +72,18 @@ function parseTxt(t, origin) {
             let dParts = data.split(/[\/\-]/);
             let ano = dParts[2].length == 2 ? "20" + dParts[2] : dParts[2];
             let ts = new Date(ano, dParts[1] - 1, dParts[0], hora.split(/[:\.]/)[0], hora.split(/[:\.]/)[1]).getTime();
-            chats[chatName].push({ sender: remetente.trim(), text: texto.trim(), ts: ts, file: texto.trim() });
+            
+            store.add({ sender: remetente.trim(), text: texto.trim(), ts: ts });
         }
     });
+
+    transaction.oncomplete = () => loadHistory(); // Recarrega e organiza tudo
+}
+
+function clearHistory() {
+    if(confirm("Deseja apagar todo o histórico?")) {
+        const transaction = db.transaction("messages", "readwrite");
+        transaction.objectStore("messages").clear();
+        transaction.oncomplete = () => loadHistory();
+    }
 }
