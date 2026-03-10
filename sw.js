@@ -1,44 +1,39 @@
-const CACHE_NAME = 'v1_web_export_cache';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'web-export-v1';
+const ASSETS = [
   './',
   './index.html',
   './estilo.css',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './icone.png',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
 ];
 
-// Instalação: Cacheia os arquivos essenciais
+// Instala os arquivos no cache
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Arquivos em cache com sucesso!');
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS);
+    })
   );
 });
 
-// Ativação: Limpa caches antigos
+// Ativa o SW e remove caches antigos
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     })
   );
 });
 
-// Busca: Serve os arquivos do cache quando offline
+// Estratégia: Tenta o Cache primeiro, se não tiver, vai na rede
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        return response || fetch(event.request);
-      })
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
+    })
   );
 });
