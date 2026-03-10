@@ -2,24 +2,26 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>WA Viewer - Cinthya</title>
+    <title>WA Viewer Android - Cinthya</title>
     <script src="https://cdnjs.cloudflare.com"></script>
     <style>
-        body { font-family: sans-serif; background: #efe7dd; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        body { font-family: 'Segoe UI', sans-serif; background: #efe7dd; margin: 0; }
         header { background: #075e54; color: white; padding: 15px; text-align: center; font-weight: bold; }
-        #chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
-        .msg { background: white; margin: 5px 0; padding: 12px; border-radius: 8px; max-width: 85%; box-shadow: 0 1px 2px rgba(0,0,0,0.1); align-self: flex-start; font-size: 14px; }
+        #controls { background: white; padding: 20px; text-align: center; border-bottom: 1px solid #ddd; }
+        #chat { padding: 15px; display: flex; flex-direction: column; max-width: 800px; margin: auto; }
+        .msg { background: white; margin: 5px 0; padding: 12px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); font-size: 14px; }
         img, video { max-width: 100%; border-radius: 8px; margin-top: 10px; display: block; }
         audio { width: 100%; margin-top: 10px; }
+        .status { color: #075e54; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<header>VISUALIZADOR CINTHYA</header>
+<header>VISUALIZADOR ANDROID - CINTHYA</header>
 
-<div style="background: white; padding: 20px; text-align: center; border-bottom: 1px solid #ddd;">
-    <input type="file" id="file-input" accept=".zip" multiple>
-    <p id="status" style="color: #666; font-size: 0.9em;">Selecione o ZIP da Cinthya aqui.</p>
+<div id="controls">
+    <input type="file" id="file-input" accept=".zip,.txt" multiple>
+    <div id="status" class="status">Selecione o ZIP do Android aqui.</div>
 </div>
 
 <div id="chat"></div>
@@ -33,79 +35,75 @@
         const files = e.target.files;
         if (!files.length) return;
 
-        status.innerText = "Lendo... aguarde.";
+        status.innerText = "🔍 Buscando conversas no ZIP do Android...";
         chat.innerHTML = "";
         
-        const allMessages = new Set();
-        const mediaUrls = new Map();
+        let mensagens = [];
+        let midias = new Map();
 
         for (const file of files) {
-            try {
+            if (file.name.toLowerCase().endsWith('.zip')) {
                 const zip = await JSZip.loadAsync(file);
                 
-                // 1. Mapeia mídias (Busca profunda)
+                // 1. Mapeia mídias (Android costuma salvar na raiz ou em subpastas)
                 for (let path in zip.files) {
                     const entry = zip.files[path];
-                    if (entry.dir || path.includes('__MACOSX')) continue;
-                    const fileName = path.split('/').pop().toLowerCase();
-                    if (fileName.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov)$/i)) {
+                    if (entry.dir) continue;
+                    const name = path.split('/').pop().toLowerCase();
+                    if (name.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov)$/i)) {
                         const blob = await entry.async("blob");
-                        mediaUrls.set(fileName, URL.createObjectURL(blob));
+                        midias.set(name, URL.createObjectURL(blob));
                     }
                 }
 
-                // 2. Lê o texto (Tenta UTF-8 e UTF-16 para iPhone)
+                // 2. Busca o arquivo de texto (No Android pode ser qualquer nome .txt)
                 for (let path in zip.files) {
                     const entry = zip.files[path];
                     if (path.toLowerCase().endsWith('.txt') && !path.includes('__MACOSX')) {
-                        const buffer = await entry.async("arraybuffer");
-                        
-                        // TESTA CODIFICAÇÕES (iPhone usa UTF-16LE frequentemente)
-                        let text = "";
-                        const decoders = ['utf-8', 'utf-16le', 'windows-1252'];
-                        for (let enc of decoders) {
-                            text = new TextDecoder(enc).decode(buffer);
-                            if (text.includes(':') || text.includes('/')) break;
-                        }
-                        
-                        text.split(/\r?\n/).forEach(line => {
-                            if (line.trim().length > 5) allMessages.add(line.trim());
+                        const text = await entry.async("string");
+                        // O Android usa o formato: DD/MM/AAAA HH:MM - Nome: Mensagem
+                        text.split(/\r?\n/).forEach(l => {
+                            if (l.trim().length > 5) mensagens.push(l.trim());
                         });
                     }
                 }
-            } catch (err) { console.error(err); }
+            } else if (file.name.toLowerCase().endsWith('.txt')) {
+                const text = await file.text();
+                text.split(/\r?\n/).forEach(l => { if(l.trim()) mensagens.push(l.trim()); });
+            }
         }
 
-        if (allMessages.size === 0) {
-            status.innerText = "Erro: O arquivo .txt não foi lido corretamente. Tente extrair o zip e ver se o .txt abre no seu PC.";
+        if (mensagens.length === 0) {
+            status.innerText = "❌ Nenhuma mensagem encontrada no ZIP do Android.";
             return;
         }
 
-        // 3. Renderiza (Ordenado por data)
-        const sorted = Array.from(allMessages).sort();
-        sorted.forEach(line => {
+        // Ordena mensagens (O sort do JS funciona bem para o padrão de data do Android)
+        mensagens.sort();
+
+        mensagens.forEach(linha => {
             const div = document.createElement('div');
             div.className = 'msg';
             
-            const fileMatch = line.match(/([\w\-. ]+\.(?:jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov))/i);
+            // Busca mídias na linha (Android usa o nome do arquivo direto no texto)
+            const match = linha.match(/([\w\-. ]+\.(?:jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov))/i);
             let mediaHtml = "";
 
-            if (fileMatch) {
-                const name = fileMatch[1].trim().toLowerCase();
-                const url = mediaUrls.get(name);
-                if (url) {
-                    const ext = name.split('.').pop();
-                    if (['jpg','jpeg','png','webp'].includes(ext)) mediaHtml = `<img src="${url}">`;
-                    else if (['mp3','opus','ogg','m4a'].includes(ext)) mediaHtml = `<audio controls src="${url}"></audio>`;
-                    else if (['mp4','mov'].includes(ext)) mediaHtml = `<video controls src="${url}"></video>`;
+            if (match) {
+                const n = match[1].trim().toLowerCase();
+                if (midias.has(n)) {
+                    const url = midias.get(n);
+                    if (n.match(/\.(jpg|jpeg|png|webp)$/)) mediaHtml = `<img src="${url}">`;
+                    else if (n.match(/\.(mp3|opus|ogg|m4a)$/)) mediaHtml = `<audio controls src="${url}"></audio>`;
+                    else if (n.match(/\.(mp4|mov)$/)) mediaHtml = `<video controls src="${url}"></video>`;
                 }
             }
 
-            div.innerHTML = `<span>${line}</span>${mediaHtml}`;
+            div.innerHTML = `<span>${linha}</span>${mediaHtml}`;
             chat.appendChild(div);
         });
 
-        status.innerText = `Sucesso! ${allMessages.size} mensagens carregadas.`;
+        status.innerText = `✅ Sucesso! ${mensagens.length} mensagens carregadas.`;
     };
 </script>
 
