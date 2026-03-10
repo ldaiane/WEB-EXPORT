@@ -1,31 +1,36 @@
 let db;
-const messagesContainer = document.getElementById("messages");
-const fileInput = document.getElementById("fileInput");
-const folderInput = document.getElementById("folderInput");
+let allMessages = [];
 
-// Inicializa IndexedDB
-const request = indexedDB.open("WhatsAppHistory", 1);
+// Inicialização do Banco de Dados
+const request = indexedDB.open("WhatsAppHistoryDB", 2);
+
 request.onupgradeneeded = e => {
     db = e.target.result;
     if (!db.objectStoreNames.contains("messages")) {
         db.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
     }
 };
-request.onsuccess = e => { db = e.target.result; loadHistory(); };
 
-// Carrega e renderiza histórico
-function loadHistory() {
+request.onsuccess = e => {
+    db = e.target.result;
+    loadHistory();
+};
+
+async function loadHistory() {
     const transaction = db.transaction("messages", "readonly");
     const store = transaction.objectStore("messages");
     const getAll = store.getAll();
-    getAll.onsuccess = () => renderMessages(getAll.result);
+    getAll.onsuccess = () => {
+        allMessages = getAll.result.sort((a, b) => a.ts - b.ts);
+        renderMessages(allMessages);
+    };
 }
 
 function renderMessages(list) {
+    const container = document.getElementById("messages");
     if (list.length === 0) return;
-    messagesContainer.innerHTML = "";
-    list.sort((a, b) => a.ts - b.ts); // Ordem Cronológica Automática
-
+    
+    container.innerHTML = "";
     list.forEach(m => {
         const div = document.createElement("div");
         div.className = "msg";
@@ -34,33 +39,47 @@ function renderMessages(list) {
             <div>${m.text}</div>
             <div class="time">${new Date(m.ts).toLocaleString()}</div>
         `;
-        messagesContainer.appendChild(div);
+        container.appendChild(div);
     });
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    container.scrollTop = container.scrollHeight;
 }
 
-// Lida com Arquivos e ZIPs
-fileInput.addEventListener("change", async e => processFiles(e.target.files));
+// Filtro de Busca
+function filterMessages() {
+    const term = document.getElementById("searchInput").value.toLowerCase();
+    const filtered = allMessages.filter(m => 
+        m.text.toLowerCase().includes(term) || m.sender.toLowerCase().includes(term)
+    );
+    renderMessages(filtered);
+}
 
-// Lida com Pastas Extraídas
-folderInput.addEventListener("change", async e => processFiles(e.target.files));
-
-async function processFiles(files) {
+// Processador de Arquivos (Pasta, ZIP, TXT)
+const processFiles = async (files) => {
     for (let file of files) {
-        if (file.name.endsWith(".zip")) {
-            const zip = await JSZip.loadAsync(file);
-            for (let name in zip.files) {
-                if (name.endsWith(".txt")) {
-                    parseAndSave(await zip.files[name].async("string"));
+        try {
+            if (file.name.endsWith(".zip")) {
+                const zip = await JSZip.loadAsync(file);
+                for (let name in zip.files) {
+                    if (name.endsWith(".txt") && !zip.files[name].dir) {
+                        const content = await zip.files[name].async("string");
+                        await parseAndSave(content);
+                    }
                 }
+            } else if (file.name.endsWith(".txt")) {
+                const content = await file.text();
+                await parseAndSave(content);
             }
-        } else if (file.name.endsWith(".txt")) {
-            parseAndSave(await file.text());
+        } catch (err) {
+            console.error("Erro no arquivo:", file.name, err);
         }
     }
-}
+    loadHistory();
+};
 
-function parseAndSave(t) {
+document.getElementById("fileInput").addEventListener("change", e => processFiles(e.target.files));
+document.getElementById("folderInput").addEventListener("change", e => processFiles(e.target.files));
+
+async function parseAndSave(t) {
     const cleanText = t.replace(/[\u200B-\u200D\uFEFF]/g, "");
     const linhas = cleanText.split("\n");
     const transaction = db.transaction("messages", "readwrite");
@@ -77,7 +96,7 @@ function parseAndSave(t) {
             store.add({ sender: remetente.trim(), text: texto.trim(), ts: ts });
         }
     });
-    transaction.oncomplete = () => loadHistory();
+    return new Promise(res => transaction.oncomplete = res);
 }
 
 function clearHistory() {
