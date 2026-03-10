@@ -9,10 +9,10 @@
         header { background: #075e54; color: white; padding: 15px; text-align: center; font-weight: bold; }
         #controls { background: white; padding: 20px; text-align: center; border-bottom: 1px solid #ddd; }
         #chat { padding: 15px; display: flex; flex-direction: column; max-width: 800px; margin: auto; }
-        .msg { background: white; margin: 5px 0; padding: 12px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); font-size: 14px; }
+        .msg { background: white; margin: 5px 0; padding: 12px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); font-size: 14px; white-space: pre-wrap; }
         img, video { max-width: 100%; border-radius: 8px; margin-top: 10px; display: block; }
         audio { width: 100%; margin-top: 10px; }
-        .status { color: #075e54; font-weight: bold; margin-top: 10px; }
+        .status { color: #075e54; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -21,7 +21,7 @@
 
 <div id="controls">
     <input type="file" id="file-input" accept=".zip,.txt" multiple>
-    <div id="status" class="status">Selecione o ZIP do Android aqui.</div>
+    <div id="status" class="status">Selecione o ZIP ou o arquivo .txt extraído.</div>
 </div>
 
 <div id="chat"></div>
@@ -35,62 +35,64 @@
         const files = e.target.files;
         if (!files.length) return;
 
-        status.innerText = "🔍 Buscando conversas no ZIP do Android...";
+        status.innerText = "🔍 Lendo conteúdo... aguarde um instante.";
         chat.innerHTML = "";
         
         let mensagens = [];
         let midias = new Map();
 
         for (const file of files) {
-            if (file.name.toLowerCase().endsWith('.zip')) {
-                const zip = await JSZip.loadAsync(file);
-                
-                // 1. Mapeia mídias (Android costuma salvar na raiz ou em subpastas)
-                for (let path in zip.files) {
-                    const entry = zip.files[path];
-                    if (entry.dir) continue;
-                    const name = path.split('/').pop().toLowerCase();
-                    if (name.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov)$/i)) {
-                        const blob = await entry.async("blob");
-                        midias.set(name, URL.createObjectURL(blob));
+            try {
+                if (file.name.toLowerCase().endsWith('.zip')) {
+                    const zip = await JSZip.loadAsync(file);
+                    
+                    // 1. Coletar todas as mídias primeiro
+                    for (let path in zip.files) {
+                        const entry = zip.files[path];
+                        if (entry.dir) continue;
+                        const name = path.split('/').pop().toLowerCase();
+                        if (name.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov)$/i)) {
+                            const blob = await entry.async("blob");
+                            midias.set(name, URL.createObjectURL(blob));
+                        }
                     }
-                }
 
-                // 2. Busca o arquivo de texto (No Android pode ser qualquer nome .txt)
-                for (let path in zip.files) {
-                    const entry = zip.files[path];
-                    if (path.toLowerCase().endsWith('.txt') && !path.includes('__MACOSX')) {
-                        const text = await entry.async("string");
-                        // O Android usa o formato: DD/MM/AAAA HH:MM - Nome: Mensagem
-                        text.split(/\r?\n/).forEach(l => {
-                            if (l.trim().length > 5) mensagens.push(l.trim());
-                        });
+                    // 2. Coletar o texto (Qualquer arquivo .txt)
+                    for (let path in zip.files) {
+                        const entry = zip.files[path];
+                        if (path.toLowerCase().endsWith('.txt')) {
+                            const text = await entry.async("string");
+                            text.split(/\r?\n/).forEach(l => {
+                                if (l.trim().length > 2) mensagens.push(l.trim());
+                            });
+                        }
                     }
+                } else if (file.name.toLowerCase().endsWith('.txt')) {
+                    const text = await file.text();
+                    text.split(/\r?\n/).forEach(l => { if(l.trim()) mensagens.push(l.trim()); });
                 }
-            } else if (file.name.toLowerCase().endsWith('.txt')) {
-                const text = await file.text();
-                text.split(/\r?\n/).forEach(l => { if(l.trim()) mensagens.push(l.trim()); });
+            } catch (err) {
+                console.error(err);
+                status.innerText = "❌ Erro ao abrir o arquivo.";
             }
         }
 
         if (mensagens.length === 0) {
-            status.innerText = "❌ Nenhuma mensagem encontrada no ZIP do Android.";
+            status.innerText = "❌ Não encontramos mensagens. O arquivo ZIP está vazio?";
             return;
         }
 
-        // Ordena mensagens (O sort do JS funciona bem para o padrão de data do Android)
-        mensagens.sort();
-
+        // Renderização
         mensagens.forEach(linha => {
             const div = document.createElement('div');
             div.className = 'msg';
             
-            // Busca mídias na linha (Android usa o nome do arquivo direto no texto)
+            // Busca o nome do arquivo na linha
             const match = linha.match(/([\w\-. ]+\.(?:jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov))/i);
             let mediaHtml = "";
 
             if (match) {
-                const n = match[1].trim().toLowerCase();
+                const n = match[0].trim().toLowerCase();
                 if (midias.has(n)) {
                     const url = midias.get(n);
                     if (n.match(/\.(jpg|jpeg|png|webp)$/)) mediaHtml = `<img src="${url}">`;
@@ -103,7 +105,7 @@
             chat.appendChild(div);
         });
 
-        status.innerText = `✅ Sucesso! ${mensagens.length} mensagens carregadas.`;
+        status.innerText = `✅ Carregadas ${mensagens.length} mensagens com sucesso!`;
     };
 </script>
 
