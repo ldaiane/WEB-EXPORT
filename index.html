@@ -2,41 +2,40 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chat Viewer Ultra - 20GB</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#075e54">
-    <link rel="stylesheet" href="estilo.css">
+    <title>Visualizador WhatsApp 20GB</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #ece5dd; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #075e54; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        #chatView { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; }
+        .msg { background: white; padding: 8px; border-radius: 7px; margin-bottom: 8px; max-width: 80%; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+        .sender { font-weight: bold; color: #075e54; font-size: 0.8em; }
+        .time { font-size: 0.7em; color: #999; text-align: right; }
+        img, video { max-width: 100%; border-radius: 5px; margin-top: 5px; }
+        
+        /* Tela de Loading */
+        #loadingOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); 
+                          color:white; z-index:9999; display:none; flex-direction:column; align-items:center; justify-content:center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #25d366; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .progress-bg { width: 80%; background: #333; height: 10px; border-radius: 5px; margin-top: 15px; }
+        #progressBar { width: 0%; background: #25d366; height: 100%; border-radius: 5px; transition: 0.2s; }
+    </style>
 </head>
 <body>
     <header>
-        <div class="top-bar">
-            <div class="brand">Chat View <small id="stats"></small></div>
-            <button onclick="clearHistory()" class="btn-clear">Limpar Tudo</button>
-        </div>
-        <div class="controls">
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="🔍 Buscar..." oninput="filterMessages()">
-                <input type="date" id="dateFilter" onchange="filterByDate()">
-            </div>
-            <div class="import-box">
-                <label for="fileInput" class="btn-import">📄 Selecionar Arquivos/ZIP</label>
-                <input type="file" id="fileInput" multiple style="display: none;">
-                <label for="folderInput" class="btn-import hide-mobile">📂 Pasta</label>
-                <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
-            </div>
-        </div>
+        <div>WhatsApp Viewer <span id="stats"></span></div>
+        <input type="file" id="fileInput" multiple>
+        <button onclick="clearHistory()">Limpar Banco</button>
     </header>
 
-    <div id="loadingBarContainer" style="display:none; background:#ccc; height:5px; width:100%;">
-        <div id="loadingBar" style="height:100%; background:#25d366; width:0%; transition: 0.1s;"></div>
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <p id="statusLabel">Lendo arquivo...</p>
+        <div class="progress-bg"><div id="progressBar"></div></div>
+        <p id="errorLabel" style="color:#ff5252; display:none;"></p>
     </div>
 
-    <main id="chatView">
-        <div id="messages">
-            <div class="welcome-msg">Selecione o arquivo .txt ou .zip para carregar.</div>
-        </div>
-    </main>
+    <main id="chatView"><div id="messages"></div></main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="app.js"></script>
