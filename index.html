@@ -3,59 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WA MASTER CHRONO</title>
+    <title>WA MASTER - ARQUIVOS LIBERADOS</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root { --wa-green: #075e54; --wa-light: #25d366; --bg: #d1d7db; }
-        * { box-sizing: border-box; font-family: -apple-system, sans-serif; }
+        * { box-sizing: border-box; font-family: sans-serif; }
         body { margin: 0; background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        header { background: var(--wa-green); color: white; padding: 12px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .tabs { display: flex; background: var(--wa-green); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        header { background: var(--wa-green); color: white; padding: 12px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; justify-content: space-between; align-items: center; }
+        .tabs { display: flex; background: var(--wa-green); }
         .tab { flex: 1; padding: 15px; text-align: center; font-weight: bold; color: rgba(255,255,255,0.6); cursor: pointer; border-bottom: 3px solid transparent; }
         .tab.active { color: white; border-bottom-color: white; }
 
         .controls { background: #f0f2f5; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #ccc; }
-        .row { display: flex; gap: 5px; }
-        input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; }
-        .btn { border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; background: var(--wa-green); }
-        .btn-import { background: var(--wa-light) !important; color: #000; width: 100%; padding: 15px; display: block; text-align: center; border-radius: 8px; font-weight: bold; text-decoration: none; }
+        .btn-import { background: var(--wa-light) !important; color: #000; width: 100%; padding: 18px; display: block; text-align: center; border-radius: 8px; font-weight: bold; text-decoration: none; cursor: pointer; font-size: 16px; border: none; }
 
-        main { flex: 1; overflow-y: auto; position: relative; background: #e5ddd5; }
+        main { flex: 1; overflow-y: auto; background: #e5ddd5; position: relative; }
         .view { display: none; padding: 15px; flex-direction: column; gap: 10px; }
         .view.active { display: flex; }
 
-        /* Estilo Balões */
-        .msg { background: white; padding: 10px; border-radius: 8px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 1px rgba(0,0,0,0.2); position: relative; animation: fadeIn 0.3s ease; }
+        .msg { background: white; padding: 10px; border-radius: 8px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 1px rgba(0,0,0,0.2); }
         .msg.me { align-self: flex-end; background: #dcf8c6; }
-        .sender { font-weight: bold; color: #e91e63; font-size: 11px; margin-bottom: 4px; display: block; }
-        .text { font-size: 14.5px; color: #111; word-wrap: break-word; line-height: 1.4; white-space: pre-wrap; }
+        .sender { font-weight: bold; color: #075e54; font-size: 11px; display: block; margin-bottom: 4px; }
+        .text { font-size: 14.5px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
         .time { font-size: 10px; color: #667781; text-align: right; margin-top: 4px; }
 
-        /* Mídia */
-        .m-content { margin-top: 8px; border-radius: 4px; overflow: hidden; border: 1px solid #ddd; background: #f8f9fa; }
-        img, video { max-width: 100%; display: block; height: auto; cursor: pointer; }
-        audio { width: 100%; height: 40px; margin-top: 5px; }
-        
-        /* Galeria Grid */
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-        .grid-item { aspect-ratio: 1/1; background: #e2e2e2; border-radius: 2px; overflow: hidden; position: relative; cursor: pointer; }
+        .grid-item { aspect-ratio: 1/1; background: #ddd; overflow: hidden; }
         .grid-item img, .grid-item video { width: 100%; height: 100%; object-fit: cover; }
-        .tag { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: white; padding: 2px 5px; font-size: 10px; border-radius: 3px; }
 
-        #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.98); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
         .bar-wrap { width: 100%; background: #ddd; height: 10px; border-radius: 5px; margin: 20px 0; overflow: hidden; }
         #bar { background: var(--wa-light); width: 0%; height: 100%; transition: 0.1s; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
     <header>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-weight:bold; font-size:18px;">WA Chrono Viewer</span>
-            <button class="btn" onclick="resetDB()" style="background:#ea4335; font-size:12px;">Limpar Tudo</button>
-        </div>
+        <span style="font-weight:bold;">WA Pro Viewer</span>
+        <button onclick="resetDB()" style="background:#ea4335; color:white; border:none; border-radius:5px; padding:5px 10px;">Limpar</button>
     </header>
 
     <div class="tabs">
@@ -64,12 +50,9 @@
     </div>
 
     <div class="controls">
-        <div class="row">
-            <input type="text" id="search" placeholder="🔍 Buscar na conversa...">
-            <button class="btn" onclick="renderChat(document.getElementById('search').value)">🔍</button>
-        </div>
-        <label for="files" class="btn-import">📂 IMPORTAR ZIPs / PASTAS</label>
-        <input type="file" id="files" multiple webkitdirectory directory style="display: none;">
+        <label for="files" class="btn-import">📂 SELECIONAR ARQUIVOS (ZIP, TXT, FOTOS)</label>
+        <input type="file" id="files" multiple style="display: none;">
+        <input type="text" id="search" placeholder="🔍 Pesquisar na conversa..." onkeyup="renderChat(this.value)" style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc; outline:none;">
     </div>
 
     <main id="scroll-area">
@@ -78,24 +61,22 @@
     </main>
 
     <div id="loader">
-        <h2 id="l-title">Organizando Backup...</h2>
+        <h2 id="l-title">Processando...</h2>
         <div class="bar-wrap"><div id="bar"></div></div>
-        <p id="l-info" style="font-weight: bold; color: var(--wa-green);"></p>
-        <p style="font-size: 11px; color: #777;">Processando ordem cronológica e rejeitando duplicatas...</p>
+        <p id="l-info" style="font-weight:bold; color:var(--wa-green);"></p>
     </div>
 
     <script>
         let db;
-        const DB_NAME = "WA_CHRONO_FINAL";
+        const DB_NAME = "WA_FINAL_LIBERADO";
 
-        const req = indexedDB.open(DB_NAME, 2);
+        const req = indexedDB.open(DB_NAME, 1);
         req.onupgradeneeded = e => {
             const d = e.target.result;
-            if (d.objectStoreNames.contains("msgs")) d.deleteObjectStore("msgs");
             const ms = d.createObjectStore("msgs", { keyPath: "id", autoIncrement: true });
             ms.createIndex("hash", "hash", { unique: true });
-            ms.createIndex("timestamp", "ts", { unique: false });
-            if (!d.objectStoreNames.contains("media")) d.createObjectStore("media", { keyPath: "name" });
+            ms.createIndex("ts", "ts", { unique: false });
+            d.createObjectStore("media", { keyPath: "name" });
         };
         req.onsuccess = e => { db = e.target.result; renderChat(); };
 
@@ -111,24 +92,22 @@
             const files = Array.from(e.target.files);
             if (!files.length) return;
             document.getElementById('loader').style.display = 'flex';
-            
             let stats = { s: 0, d: 0, m: 0 };
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
+                document.getElementById('l-title').innerText = `Lendo: ${file.name}`;
                 document.getElementById('bar').style.width = `${((i+1)/files.length)*100}%`;
 
                 if (file.name.toLowerCase().endsWith('.zip')) {
                     const zip = await JSZip.loadAsync(file);
-                    const entries = Object.keys(zip.files).filter(k => !zip.files[k].dir);
-                    for (let entryName of entries) {
-                        const fName = entryName.split('/').pop();
-                        const entry = zip.files[entryName];
+                    for (let path in zip.files) {
+                        const fName = path.split('/').pop();
                         if (fName.toLowerCase().endsWith('.txt')) {
-                            const res = await saveMsgs(parse(await entry.async("string")));
+                            const res = await saveMsgs(parse(await zip.files[path].async("string")));
                             stats.s += res.s; stats.d += res.d;
-                        } else {
-                            await saveMedia(fName, await entry.async("blob"));
+                        } else if (fName.length > 3) {
+                            await saveMedia(fName, await zip.files[path].async("blob"));
                             stats.m++;
                         }
                     }
@@ -141,27 +120,18 @@
                 }
                 document.getElementById('l-info').innerText = `${stats.s} novas / ${stats.d} duplicadas`;
             }
-
             document.getElementById('loader').style.display = 'none';
-            alert(`ORDEM CRONOLÓGICA CONCLUÍDA!\n\n✅ Mensagens: ${stats.s}\n🚫 Duplicatas: ${stats.d}\n📂 Arquivos: ${stats.m}`);
-            location.reload();
+            renderChat();
         };
 
         function parse(txt) {
-            // Regex flexível para diferentes formatos de data [DD/MM/YY HH:MM:SS] ou DD/MM/YYYY - Pessoa:
-            const regex = /\[?(\d{2})[.\/-](\d{2})[.\/-](\d{2,4})[, ]+(\d{2}:\d{2})(?::\d{2})?\]?[\s-]*?([^:]+):\s(.+)/;
+            const regex = /(\d{2})[.\/-](\d{2})[.\/-](\d{2,4}).*?(\d{2}:\d{2}).*?([^:]+):\s(.+)/;
             return txt.split("\n").map(l => {
                 const m = l.match(regex);
                 if (!m) return null;
-                
-                const d = m[1], mo = m[2], y = m[3].length === 2 ? "20"+m[3] : m[3];
-                const time = m[4], sender = m[5].trim(), text = m[6].trim();
-                
-                // Cria timestamp para ordenação real
-                const ts = new Date(`${y}-${mo}-${d}T${time}:00`).getTime();
-                const hash = btoa(unescape(encodeURIComponent(ts + sender + text.substring(0,50))));
-                
-                return { date: `${d}/${mo}/${y}`, time, sender, text, ts, hash };
+                const ts = new Date(`${m[3].length==2?'20'+m[3]:m[3]}-${m[2]}-${m[1]}T${m[4]}:00`).getTime();
+                const hash = btoa(unescape(encodeURIComponent(ts + m[5] + m[6].substring(0,50))));
+                return { date: `${m[1]}/${m[2]}`, time: m[4], sender: m[5], text: m[6], ts, hash };
             }).filter(x => x);
         }
 
@@ -169,84 +139,58 @@
             return new Promise(r => {
                 const tx = db.transaction("msgs", "readwrite");
                 const store = tx.objectStore("msgs");
-                let s = 0, d = 0;
-                data.forEach(msg => {
-                    const q = store.add(msg);
+                let s=0, d=0;
+                data.forEach(m => {
+                    const q = store.add(m);
                     q.onsuccess = () => s++;
-                    q.onerror = (e) => { e.preventDefault(); e.stopPropagation(); d++; };
+                    q.onerror = () => d++;
                 });
                 tx.oncomplete = () => r({s, d});
             });
         }
 
         function saveMedia(name, blob) {
-            return new Promise(r => {
-                const tx = db.transaction("media", "readwrite");
-                tx.objectStore("media").put({ name, data: blob });
-                tx.oncomplete = () => r();
-            });
+            const tx = db.transaction("media", "readwrite");
+            tx.objectStore("media").put({ name, data: blob });
         }
 
-        async function renderChat(filter = "") {
-            const container = document.getElementById('chat-view');
-            container.innerHTML = "Ordenando cronologicamente...";
+        async function renderChat(f = "") {
+            const view = document.getElementById('chat-view');
             const tx = db.transaction(["msgs", "media"], "readonly");
-            const mediaKeys = await new Promise(r => tx.objectStore("media").getAllKeys().onsuccess = ev => r(ev.target.result));
-            
-            tx.objectStore("msgs").index("timestamp").getAll().onsuccess = async e => {
+            tx.objectStore("msgs").index("ts").getAll().onsuccess = async e => {
                 let msgs = e.target.result;
-                if(filter) msgs = msgs.filter(m => m.text.toLowerCase().includes(filter.toLowerCase()));
-                
-                container.innerHTML = "";
+                if(f) msgs = msgs.filter(m => m.text.toLowerCase().includes(f.toLowerCase()));
+                view.innerHTML = "";
                 const frag = document.createDocumentFragment();
-                
-                for (let m of msgs.slice(-500)) { // Mostra as 500 mais recentes ordenadas
+                msgs.slice(-500).forEach(m => {
                     const div = document.createElement('div');
-                    div.className = `msg ${m.sender.toLowerCase().includes('você') ? 'me' : ''}`;
-                    let mHtml = "";
-                    
-                    const clean = m.text.toLowerCase().replace(/[<>:" ]/g, "");
-                    const found = mediaKeys.find(k => clean.includes(k.toLowerCase()) || k.toLowerCase().includes(clean));
-
-                    if (found && m.text.length > 2) {
-                        const blob = await new Promise(r => db.transaction("media").objectStore("media").get(found).onsuccess = ev => r(ev.target.result?.data));
-                        if (blob) {
-                            const url = URL.createObjectURL(blob);
-                            if (found.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mHtml = `<div class="m-content"><img src="${url}" onclick="window.open('${url}')"></div>`;
-                            else if (found.match(/\.(mp4|webm|3gp)$/i)) mHtml = `<div class="m-content"><video src="${url}" controls></video></div>`;
-                            else if (found.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) mHtml = `<audio src="${url}" controls></audio>`;
-                            else if (found.match(/\.pdf$/i)) mHtml = `<div class="m-content" onclick="window.open('${url}')" style="padding:10px; cursor:pointer;">📄 PDF: ${found}</div>`;
-                        }
-                    }
-                    div.innerHTML = `<span class="sender">${m.sender}</span><div class="text">${m.text}</div>${mHtml}<div class="time">${m.date} ${m.time}</div>`;
+                    div.className = `msg ${m.sender.toLowerCase().includes('você')?'me':''}`;
+                    div.innerHTML = `<span class="sender">${m.sender}</span><div class="text">${m.text}</div><div class="time">${m.date} ${m.time}</div>`;
                     frag.appendChild(div);
-                }
-                container.appendChild(frag);
-                document.getElementById('scroll-area').scrollTop = container.scrollHeight;
+                });
+                view.appendChild(frag);
+                document.getElementById('scroll-area').scrollTop = view.scrollHeight;
             };
         }
 
-        async function renderGallery() {
+        function renderGallery() {
             const grid = document.getElementById('grid');
-            grid.innerHTML = "Ordenando mídias...";
             db.transaction("media").objectStore("media").getAll().onsuccess = e => {
-                // Ordena galeria pelo nome (WhatsApp salva como IMG-YYYYMMDD...)
-                let items = e.target.result.sort((a,b) => b.name.localeCompare(a.name));
                 grid.innerHTML = "";
-                items.forEach(item => {
-                    const url = URL.createObjectURL(item.data);
-                    const d = document.createElement('div');
-                    d.className = 'grid-item';
-                    if (item.name.match(/\.(jpg|jpeg|png|webp|gif)$/i)) d.innerHTML = `<img src="${url}" onclick="window.open('${url}')">`;
-                    else if (item.name.match(/\.(mp4|webm|3gp)$/i)) d.innerHTML = `<video src="${url}"></video><span class="tag">🎥</span>`;
-                    else if (item.name.match(/\.pdf$/i)) d.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:10px;" onclick="window.open('${url}')">PDF</div><span class="tag">📄</span>`;
-                    else return;
-                    grid.appendChild(d);
+                e.target.result.forEach(item => {
+                    if (item.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                        const img = document.createElement('img');
+                        img.src = URL.createObjectURL(item.data);
+                        const d = document.createElement('div');
+                        d.className = 'grid-item';
+                        d.appendChild(img);
+                        grid.appendChild(d);
+                    }
                 });
             };
         }
 
-        function resetDB() { if(confirm("Apagar todos os dados e começar do zero?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } }
+        function resetDB() { if(confirm("Zerar tudo?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } }
     </script>
 </body>
 </html>
