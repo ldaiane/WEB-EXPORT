@@ -3,121 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WhatsApp Backup Viewer</title>
+    <title>WhatsApp Viewer Fix</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { --wa-green: #128C7E; --wa-bg: #e5ddd5; --wa-msg-me: #dcf8c6; }
-        body { font-family: -apple-system, sans-serif; margin: 0; background: var(--wa-bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
-        /* CABEÇALHO MOBILE */
-        header { background: var(--wa-green); color: white; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
+        :root { --wa-green: #128C7E; --wa-bg: #e5ddd5; }
+        body { font-family: sans-serif; margin: 0; background: var(--wa-bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        header { background: var(--wa-green); color: white; padding: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .row { display: flex; justify-content: space-between; align-items: center; }
-        .btn-group { display: flex; gap: 4px; }
-        
-        button, .btn-main { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 10px; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
-        .search-container { display: flex; gap: 5px; }
-        input[type="text"] { flex: 1; padding: 10px; border-radius: 4px; border: none; font-size: 16px; outline: none; }
-        .btn-import { background: #25d366 !important; text-align: center; width: 100%; display: block; padding: 12px; margin-top: 5px; }
-
-        /* ÁREA DAS MENSAGENS */
-        #chatView { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; scroll-behavior: smooth; }
-        .msg { background: white; padding: 10px; border-radius: 8px; margin-bottom: 8px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 1px rgba(0,0,0,0.1); position: relative; }
-        .sender { font-weight: bold; color: #075e54; font-size: 11px; margin-bottom: 2px; text-transform: capitalize; }
+        button, .btn-import { background: #25d366; border: none; color: white; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; text-align: center; }
+        input[type="text"] { flex: 1; padding: 10px; border-radius: 5px; border: none; font-size: 16px; }
+        #chatView { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
+        .msg { background: white; padding: 12px; border-radius: 10px; margin-bottom: 10px; max-width: 85%; align-self: flex-start; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .sender { font-weight: bold; color: #075e54; font-size: 12px; margin-bottom: 4px; }
         .text { font-size: 15px; color: #333; word-wrap: break-word; }
-        .time { font-size: 10px; color: #999; text-align: right; margin-top: 4px; }
-        
-        /* MÍDIAS */
-        img, video { max-width: 100%; border-radius: 6px; margin-top: 8px; display: block; background: #eee; }
-        audio { width: 100%; margin-top: 8px; outline: none; }
-
-        /* OVERLAY DE CARREGAMENTO */
-        #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; padding: 20px; text-align: center; }
-        .spinner { width: 45px; height: 45px; border: 5px solid #333; border-top: 5px solid #25d366; border-radius: 50%; animation: spin 1s linear infinite; }
+        .time { font-size: 10px; color: #999; text-align: right; margin-top: 5px; }
+        img, video { max-width: 100%; border-radius: 8px; margin-top: 10px; display: block; border: 1px solid #ddd; }
+        audio { width: 100%; margin-top: 10px; }
+        #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; padding: 20px; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #333; border-top: 4px solid #25d366; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        .prog-bg { width: 100%; background: #222; height: 10px; border-radius: 5px; margin: 20px 0; overflow: hidden; }
-        #prog-bar { background: #25d366; width: 0%; height: 100%; transition: 0.1s; }
+        .bar { width: 100%; background: #222; height: 10px; border-radius: 5px; margin: 15px 0; overflow: hidden; }
+        #progress { background: #25d366; width: 0%; height: 100%; transition: 0.1s; }
     </style>
 </head>
 <body>
 
     <header>
         <div class="row">
-            <div style="font-size: 16px;">WhatsApp <span id="stats"></span></div>
-            <div class="btn-group">
-                <button onclick="exportBackup()">Backup</button>
-                <button onclick="clearHistory()" style="background:#d9534f">Limpar</button>
-            </div>
+            <div style="font-weight: bold;">WA Viewer <span id="stats"></span></div>
+            <button onclick="clearHistory()" style="background:#d9534f">Limpar</button>
         </div>
-        <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Buscar na conversa...">
-            <button onclick="searchMessages()" style="background:rgba(0,0,0,0.3)">🔍</button>
+        <div class="row" style="gap:5px;">
+            <input type="text" id="searchInput" placeholder="Pesquisar...">
+            <button onclick="searchMessages()">🔍</button>
         </div>
-        <label for="fileInput" class="btn-import btn-main">📂 SELECIONAR ZIP DE 20GB</label>
+        <label for="fileInput" class="btn-import">📂 SELECIONAR ZIP (20GB)</label>
         <input type="file" id="fileInput" multiple style="display: none;">
     </header>
 
     <div id="loading">
         <div class="spinner"></div>
-        <h3 id="statusLabel">Iniciando...</h3>
-        <p>Processando 20GB de dados. Não feche esta aba!</p>
-        <div class="prog-bg"><div id="prog-bar"></div></div>
+        <h3 id="statusLabel">Lendo...</h3>
+        <div class="bar"><div id="progress"></div></div>
     </div>
 
     <main id="chatView"><div id="messages"></div></main>
 
     <script>
         let db;
-        let allMessages = [];
-
-        // 1. ABRIR BANCO DE DADOS PERSISTENTE
-        if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-
-        const request = indexedDB.open("WhatsAppDB", 1);
+        const request = indexedDB.open("WhatsAppDB", 5); // Versão aumentada para resetar índices
+        
         request.onupgradeneeded = e => {
             let d = e.target.result;
+            if (d.objectStoreNames.contains("messages")) d.deleteObjectStore("messages");
+            if (d.objectStoreNames.contains("media")) d.deleteObjectStore("media");
             d.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
             d.createObjectStore("media", { keyPath: "name" });
         };
+
         request.onsuccess = e => { db = e.target.result; loadHistory(); };
 
-        // 2. CARREGAR HISTÓRICO
         async function loadHistory() {
             if (!db) return;
-            const tx = db.transaction(["messages", "media"], "readonly");
-            const mediaKeys = await new Promise(r => tx.objectStore("media").getAllKeys().onsuccess = e => r(e.target.result));
+            const tx = db.transaction(["messages"], "readonly");
             tx.objectStore("messages").getAll().onsuccess = e => {
-                allMessages = e.target.result.sort((a, b) => a.ts - b.ts);
-                document.getElementById("stats").innerText = `(${allMessages.length})`;
-                render(allMessages.slice(-300), mediaKeys);
+                const msgs = e.target.result.sort((a, b) => a.ts - b.ts);
+                document.getElementById("stats").innerText = `(${msgs.length})`;
+                render(msgs.slice(-200)); 
             };
         }
 
-        // 3. RENDERIZAR MENSAGENS COM MÍDIA SOB DEMANDA
-        async function render(list, mediaKeys) {
+        async function render(list) {
             const container = document.getElementById("messages");
             container.innerHTML = "";
-            const frag = document.createDocumentFragment();
-
             for (let m of list) {
                 const div = document.createElement("div");
                 div.className = "msg";
-                let mediaHtml = "";
                 const cleanText = m.text.trim();
-
-                if (mediaKeys.includes(cleanText)) {
+                
+                // Busca automática de mídia pelo nome do arquivo
+                let mediaHtml = "";
+                if (cleanText.includes(".")) {
                     const blob = await getMedia(cleanText);
                     if (blob) {
                         const url = URL.createObjectURL(blob);
                         if (cleanText.match(/\.(jpg|jpeg|png|webp)$/i)) mediaHtml = `<img src="${url}">`;
                         else if (cleanText.match(/\.(mp4|webm)$/i)) mediaHtml = `<video src="${url}" controls></video>`;
-                        else if (cleanText.match(/\.(opus|mp3|m4a)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
+                        else if (cleanText.match(/\.(opus|mp3|m4a|ogg)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
                     }
                 }
 
                 div.innerHTML = `<div class="sender">${m.sender}</div><div class="text">${m.text}</div>${mediaHtml}<div class="time">${m.dataStr || ''}</div>`;
-                frag.appendChild(div);
+                container.appendChild(div);
             }
-            container.appendChild(frag);
             document.getElementById("chatView").scrollTop = document.getElementById("chatView").scrollHeight;
         }
 
@@ -128,34 +106,30 @@
             });
         }
 
-        // 4. PROCESSAR ZIP DE 20GB
         document.getElementById("fileInput").onchange = async (e) => {
             const files = e.target.files;
             if (!files.length) return;
             document.getElementById("loading").style.display = "flex";
 
             for (let file of files) {
-                try {
-                    const zip = await JSZip.loadAsync(file);
-                    const entries = Object.keys(zip.files).filter(n => !zip.files[n].dir);
-                    const total = entries.length;
+                const zip = await JSZip.loadAsync(file);
+                const entries = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+                
+                for (let i = 0; i < entries.length; i++) {
+                    const name = entries[i];
+                    const shortName = name.split('/').pop();
+                    document.getElementById("progress").style.width = `${((i+1)/entries.length)*100}%`;
+                    document.getElementById("statusLabel").innerText = `Salvando: ${shortName}`;
 
-                    for (let i = 0; i < total; i++) {
-                        const name = entries[i];
-                        const shortName = name.split('/').pop();
-                        document.getElementById("statusLabel").innerText = `Importando: ${shortName}`;
-                        document.getElementById("prog-bar").style.width = `${((i+1)/total)*100}%`;
-
-                        if (name.endsWith(".txt")) {
-                            const txt = await zip.files[name].async("string");
-                            await save("messages", parse(txt));
-                        } else {
-                            const blob = await zip.files[name].async("blob");
-                            await saveMedia(shortName, blob);
-                        }
-                        if (i % 40 === 0) await new Promise(r => setTimeout(r, 5));
+                    if (name.endsWith(".txt")) {
+                        const txt = await zip.files[name].async("string");
+                        await saveMsgs(parse(txt));
+                    } else {
+                        const blob = await zip.files[name].async("blob");
+                        await saveMedia(shortName, blob);
                     }
-                } catch (err) { alert("Erro no ZIP: " + err.message); }
+                    if (i % 50 === 0) await new Promise(r => setTimeout(r, 5));
+                }
             }
             location.reload();
         };
@@ -164,15 +138,18 @@
             const regex = /(\d{2}\/\d{2}\/\d{2,4}).*?-\s([^:]+):\s(.+)/;
             return content.split("\n").map(l => {
                 const m = l.match(regex);
-                if (m) return { dataStr: m[1], sender: m[2], text: m[3].replace("<Arquivo anexado: ", "").replace(">", ""), ts: Date.now() };
+                if (m) {
+                    let text = m[3].replace("<Arquivo anexado: ", "").replace(">", "").trim();
+                    return { dataStr: m[1], sender: m[2], text: text, ts: Date.now() };
+                }
                 return null;
             }).filter(x => x);
         }
 
-        function save(store, data) {
+        function saveMsgs(data) {
             return new Promise(r => {
-                const tx = db.transaction(store, "readwrite");
-                data.forEach(d => tx.objectStore(store).put(d));
+                const tx = db.transaction("messages", "readwrite");
+                data.forEach(d => tx.objectStore("messages").put(d));
                 tx.oncomplete = () => r();
             });
         }
@@ -180,51 +157,29 @@
         function saveMedia(name, blob) {
             return new Promise(r => {
                 const tx = db.transaction("media", "readwrite");
-                tx.objectStore("media").put({ name, data: blob });
+                tx.objectStore("media").put({ name: name, data: blob });
                 tx.oncomplete = () => r();
             });
         }
 
-        // 5. BUSCA OTIMIZADA
-        async function searchMessages() {
-            const term = document.getElementById("searchInput").value.toLowerCase();
-            if (!term) return loadHistory();
-            
-            document.getElementById("loading").style.display = "flex";
-            document.getElementById("statusLabel").innerText = "Buscando...";
-            
-            const results = [];
-            const tx = db.transaction("messages", "readonly");
-            tx.objectStore("messages").openCursor().onsuccess = e => {
-                const cursor = e.target.result;
-                if (cursor) {
-                    if (cursor.value.text.toLowerCase().includes(term)) results.push(cursor.value);
-                    if (results.length < 1000) cursor.continue();
-                    else finalizeSearch(results);
-                } else finalizeSearch(results);
-            };
-        }
-
-        async function finalizeSearch(res) {
-            const keys = await new Promise(r => db.transaction("media", "readonly").objectStore("media").getAllKeys().onsuccess = e => r(e.target.result));
-            render(res, keys);
-            document.getElementById("loading").style.display = "none";
-        }
-
-        async function exportBackup() {
-            const msgs = await new Promise(r => db.transaction("messages", "readonly").objectStore("messages").getAll().onsuccess = e => r(e.target.result));
-            const blob = new Blob([JSON.stringify(msgs)], {type: "application/json"});
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "backup_wa.json";
-            a.click();
-        }
-
         function clearHistory() {
-            if(confirm("Apagar tudo permanentemente?")) {
+            if(confirm("Apagar tudo?")) {
                 indexedDB.deleteDatabase("WhatsAppDB");
                 location.reload();
             }
+        }
+
+        async function searchMessages() {
+            const term = document.getElementById("searchInput").value.toLowerCase();
+            const tx = db.transaction("messages", "readonly");
+            const res = [];
+            tx.objectStore("messages").openCursor().onsuccess = e => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    if (cursor.value.text.toLowerCase().includes(term)) res.push(cursor.value);
+                    cursor.continue();
+                } else render(res);
+            };
         }
     </script>
 </body>
