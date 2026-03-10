@@ -2,8 +2,7 @@ let db;
 let allMessages = [];
 let mediaCache = new Map();
 
-// Abre o banco
-const request = indexedDB.open("WhatsAppHistoryDB", 60);
+const request = indexedDB.open("WhatsAppHistoryDB", 80);
 request.onupgradeneeded = e => {
     db = e.target.result;
     if (!db.objectStoreNames.contains("messages")) db.createObjectStore("messages", { keyPath: "id", autoIncrement: true });
@@ -14,81 +13,118 @@ request.onsuccess = e => { db = e.target.result; loadHistory(); };
 async function loadHistory() {
     if (!db) return;
     const tx = db.transaction(["messages", "media"], "readonly");
-    tx.objectStore("messages").getAll().onsuccess = (e) => {
-        allMessages = e.target.result.sort((a, b) => a.ts - b.ts);
-        document.getElementById("stats").innerText = `(${allMessages.length})`;
-        renderMessages(allMessages.slice(-200));
+    
+    // Carrega mídias primeiro para o cache
+    tx.objectStore("media").getAll().onsuccess = (e) => {
+        mediaCache.clear();
+        e.target.result.forEach(m => {
+            mediaCache.set(m.name, URL.createObjectURL(m.data));
+        });
+
+        // Depois carrega as mensagens
+        tx.objectStore("messages").getAll().onsuccess = (e) => {
+            allMessages = e.target.result.sort((a, b) => a.ts - b.ts);
+            document.getElementById("stats").innerText = `(${allMessages.length} mensagens)`;
+            renderMessages(allMessages.slice(-500)); 
+        };
     };
 }
 
 function renderMessages(list) {
     const container = document.getElementById("messages");
     container.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+
     list.forEach(m => {
         const div = document.createElement("div");
         div.className = "msg";
-        div.innerHTML = `<div class="sender">${m.sender}</div><div>${m.text}</div><div class="time">${new Date(m.ts).toLocaleString()}</div>`;
-        container.appendChild(div);
+        
+        let mediaHtml = "";
+        const fileName = m.text.trim(); // O WhatsApp coloca o nome do arquivo no texto da msg
+
+        if (mediaCache.has(fileName)) {
+            const url = mediaCache.get(fileName);
+            if (fileName.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+                mediaHtml = `<img src="${url}" loading="lazy">`;
+            } else if (fileName.match(/\.(mp4|webm)$/i)) {
+                mediaHtml = `<video src="${url}" controls></video>`;
+            } else if (fileName.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) {
+                mediaHtml = `<audio src="${url}" controls></audio>`;
+            }
+        }
+
+        div.innerHTML = `
+            <div class="sender">${m.sender}</div>
+            <div>${m.text}</div>
+            ${mediaHtml}
+            <div class="time">${m.dataStr || ''}</div>
+        `;
+        fragment.appendChild(div);
     });
+    container.appendChild(fragment);
 }
 
-// Processamento Blindado
 document.getElementById("fileInput").onchange = async (e) => {
     const files = e.target.files;
     if (!files.length) return;
 
-    const overlay = document.getElementById("loadingOverlay");
-    const bar = document.getElementById("progressBar");
+    document.getElementById("loadingOverlay").style.display = "flex";
     const label = document.getElementById("statusLabel");
-
-    overlay.style.display = "flex";
 
     for (let file of files) {
         try {
             if (file.name.endsWith(".zip")) {
                 const zip = await JSZip.loadAsync(file);
                 const entries = Object.keys(zip.files).filter(n => !zip.files[n].dir);
-                
+
                 for (let i = 0; i < entries.length; i++) {
                     const name = entries[i];
-                    label.innerText = `Lendo: ${name.split('/').pop()}`;
-                    bar.style.width = `${((i + 1) / entries.length) * 100}%`;
+                    const shortName = name.split('/').pop();
+                    label.innerText = `Processando: ${shortName}`;
 
                     if (name.endsWith(".txt")) {
                         const content = await zip.files[name].async("string");
-                        await saveToDB("messages", parseText(content));
+                        await saveBatch("messages", parseText(content));
+                    } else {
+                        // Salva imagens e áudios no banco
+                        const blob = await zip.files[name].async("blob");
+                        await saveMedia(shortName, blob);
                     }
                 }
             }
         } catch (err) {
             console.error(err);
-            document.getElementById("errorLabel").style.display = "block";
-            document.getElementById("errorLabel").innerText = "Erro: " + err.message;
         }
     }
-    overlay.style.display = "none";
-    loadHistory();
+    document.getElementById("loadingOverlay").style.display = "none";
+    location.reload(); // Recarrega para ativar os URLs das mídias
 };
 
 function parseText(content) {
     const lines = content.split("\n");
-    const regex = /^\[?(\d{2}[\/\-]\d{2}[\/\-]\d{2,4}).*?\]?\s?([^:]+):\s(.+)$/;
+    // Regex ajustada para pegar nomes de arquivos anexados
+    const regex = /(\d{2}\/\d{2}\/\d{2,4}).*?-\s([^:]+):\s(.+)/;
     return lines.map(l => {
         const m = l.match(regex);
-        return m ? { sender: m[2], text: m[3], ts: Date.now() } : null;
+        if (m) {
+            return { dataStr: m[1], sender: m[2], text: m[3].replace("<Arquivo anexado: ", "").replace(">", ""), ts: Date.now() };
+        }
+        return null;
     }).filter(x => x);
 }
 
-function saveToDB(storeName, data) {
+function saveBatch(storeName, data) {
     return new Promise(resolve => {
-        const tx = db.transaction([storeName], "readwrite");
-        const store = tx.objectStore(storeName);
-        data.forEach(d => store.put(d));
+        const tx = db.transaction(storeName, "readwrite");
+        data.forEach(d => tx.objectStore(storeName).put(d));
         tx.oncomplete = () => resolve();
     });
 }
 
-function clearHistory() {
-    indexedDB.deleteDatabase("WhatsAppHistoryDB");
-    location.reload();
+function saveMedia(name, blob) {
+    return new Promise(resolve => {
+        const tx = db.transaction("media", "readwrite");
+        tx.objectStore("media").put({ name, data: blob });
+        tx.oncomplete = () => resolve();
+    });
 }
