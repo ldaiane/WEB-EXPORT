@@ -2,8 +2,8 @@ let db;
 let allMessages = [];
 let mediaCache = new Map();
 
-// Abre o banco de dados - Versão aumentada para resetar qualquer estado anterior
-const request = indexedDB.open("WhatsAppHistoryDB", 25);
+// Abre o banco de dados - Versão 30 para garantir nova estrutura
+const request = indexedDB.open("WhatsAppHistoryDB", 30);
 
 request.onupgradeneeded = e => {
     db = e.target.result;
@@ -29,7 +29,7 @@ async function loadHistory() {
 
     msgsReq.onsuccess = () => {
         allMessages = msgsReq.result.sort((a, b) => a.ts - b.ts);
-        document.getElementById("stats").innerText = `(${allMessages.length})`;
+        document.getElementById("stats").innerText = `(${allMessages.length} msgs)`;
         
         mediaReq.onsuccess = () => {
             mediaCache.clear();
@@ -67,7 +67,19 @@ function renderMessages(list) {
     container.scrollTop = container.scrollHeight;
 }
 
-// SOLUÇÃO: Processamento sequencial com transações curtas
+// Função para atualizar a lista de arquivos processados na tela
+function updateFileStatus(name) {
+    const container = document.getElementById("messages");
+    let statusDiv = document.getElementById("process-status");
+    if (!statusDiv) {
+        statusDiv = document.createElement("div");
+        statusDiv.id = "process-status";
+        statusDiv.style = "background:#fff; padding:10px; border-bottom:1px solid #ddd; font-size:12px; color:#555;";
+        container.parentElement.insertBefore(statusDiv, container);
+    }
+    statusDiv.innerHTML = `Processando: <b>${name}</b> ✅`;
+}
+
 const processFiles = async (files) => {
     if (!files.length) return;
     document.getElementById("loadingBarContainer").style.display = "block";
@@ -80,13 +92,14 @@ const processFiles = async (files) => {
         try {
             if (file.name.endsWith(".zip")) {
                 const zip = await JSZip.loadAsync(file);
-                // Extrai os nomes dos arquivos dentro do ZIP
                 const names = Object.keys(zip.files);
 
                 for (let name of names) {
                     const entry = zip.files[name];
                     if (entry.dir) continue;
                     const shortName = name.split('/').pop();
+                    
+                    updateFileStatus(shortName);
 
                     if (name.endsWith(".txt")) {
                         const content = await entry.async("string");
@@ -97,8 +110,10 @@ const processFiles = async (files) => {
                     }
                 }
             } else if (file.name.endsWith(".txt")) {
+                updateFileStatus(file.name);
                 await saveInNewTransaction("messages", await file.text());
             } else {
+                updateFileStatus(file.name);
                 await saveInNewTransaction("media", { name: file.name, data: file });
             }
         } catch (err) {
@@ -107,10 +122,11 @@ const processFiles = async (files) => {
     }
     
     document.getElementById("loadingBarContainer").style.display = "none";
+    const statusDiv = document.getElementById("process-status");
+    if (statusDiv) statusDiv.remove();
     loadHistory();
 };
 
-// Abre uma transação rápida apenas para salvar e fecha logo em seguida
 function saveInNewTransaction(type, payload) {
     return new Promise((resolve) => {
         const tx = db.transaction([type], "readwrite");
@@ -140,7 +156,7 @@ function saveInNewTransaction(type, payload) {
         }
 
         tx.oncomplete = () => resolve();
-        tx.onerror = () => { console.warn("Falha ao salvar item"); resolve(); };
+        tx.onerror = () => resolve();
     });
 }
 
