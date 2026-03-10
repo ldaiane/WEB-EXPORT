@@ -1,52 +1,35 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
-<title>Chat Archive Viewer</title>
-
-<link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css">
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Export - WhatsApp Viewer</title>
+    <link rel="stylesheet" href="estilo.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#075e54">
 </head>
-
 <body>
 
-<header>
+    <header>
+        <h1 id="appTitle">Web Export</h1>
+        <input type="file" id="fileInput" multiple accept=".txt,.zip,image/*,video/*,audio/*">
+    </header>
 
-<div class="logo">Chat Viewer</div>
+    <main>
+        <div id="chatList">
+            <p class="empty-msg">Selecione um arquivo .txt ou .zip do WhatsApp para começar.</p>
+        </div>
 
-<div class="actions">
+        <div id="chatView" style="display: none;">
+            <div class="chat-header">
+                <button onclick="closeChat()">←</button>
+                <span id="chatTitle">Nome do Chat</span>
+            </div>
+            <div id="messages"></div>
+        </div>
+    </main>
 
-<button onclick="fileInput.click()">Importar</button>
-
-</div>
-
-</header>
-
-<div id="chatList"></div>
-
-<div id="chatView">
-
-<div class="chatHeader">
-
-<button onclick="closeChat()">←</button>
-
-<div id="chatTitle"></div>
-
-</div>
-
-<div id="messages"></div>
-
-</div>
-
-<input type="file" id="fileInput" multiple hidden>
-
-<script src="app.js"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
