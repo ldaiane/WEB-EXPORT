@@ -2,8 +2,8 @@ let db;
 let allMessages = [];
 let mediaCache = new Map();
 
-// Abre o banco de dados - Versão 30 para garantir nova estrutura
-const request = indexedDB.open("WhatsAppHistoryDB", 30);
+// Abre o banco com versão alta para garantir reset de bugs
+const request = indexedDB.open("WhatsAppHistoryDB", 40);
 
 request.onupgradeneeded = e => {
     db = e.target.result;
@@ -16,10 +16,7 @@ request.onupgradeneeded = e => {
     }
 };
 
-request.onsuccess = e => {
-    db = e.target.result;
-    loadHistory();
-};
+request.onsuccess = e => { db = e.target.result; loadHistory(); };
 
 async function loadHistory() {
     if (!db) return;
@@ -30,105 +27,71 @@ async function loadHistory() {
     msgsReq.onsuccess = () => {
         allMessages = msgsReq.result.sort((a, b) => a.ts - b.ts);
         document.getElementById("stats").innerText = `(${allMessages.length} msgs)`;
-        
         mediaReq.onsuccess = () => {
             mediaCache.clear();
-            mediaReq.result.forEach(m => {
-                mediaCache.set(m.name, URL.createObjectURL(m.data));
-            });
+            mediaReq.result.forEach(m => mediaCache.set(m.name, URL.createObjectURL(m.data)));
             renderMessages(allMessages.slice(-300));
         };
     };
 }
 
-function renderMessages(list) {
-    const container = document.getElementById("messages");
-    container.innerHTML = "";
-    const fragment = document.createDocumentFragment();
-
-    list.forEach(m => {
-        const div = document.createElement("div");
-        div.className = "msg";
-        let mediaHtml = "";
-        const textTrim = m.text.trim();
-        
-        if (mediaCache.has(textTrim)) {
-            const url = mediaCache.get(textTrim);
-            if (textTrim.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mediaHtml = `<div class="media-container"><img src="${url}" loading="lazy"></div>`;
-            else if (textTrim.match(/\.(mp4|webm)$/i)) mediaHtml = `<div class="media-container"><video src="${url}" controls></video></div>`;
-            else if (textTrim.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
-        }
-
-        div.innerHTML = `<div class="sender">${m.sender}</div><div>${m.text}</div>${mediaHtml}<div class="time">${new Date(m.ts).toLocaleString()}</div>`;
-        fragment.appendChild(div);
-    });
-    
-    container.appendChild(fragment);
-    container.scrollTop = container.scrollHeight;
-}
-
-// Função para atualizar a lista de arquivos processados na tela
-function updateFileStatus(name) {
-    const container = document.getElementById("messages");
-    let statusDiv = document.getElementById("process-status");
-    if (!statusDiv) {
-        statusDiv = document.createElement("div");
-        statusDiv.id = "process-status";
-        statusDiv.style = "background:#fff; padding:10px; border-bottom:1px solid #ddd; font-size:12px; color:#555;";
-        container.parentElement.insertBefore(statusDiv, container);
-    }
-    statusDiv.innerHTML = `Processando: <b>${name}</b> ✅`;
-}
-
+// O NOVO MOTOR DE PROCESSAMENTO
 const processFiles = async (files) => {
     if (!files.length) return;
-    document.getElementById("loadingBarContainer").style.display = "block";
-    const bar = document.getElementById("loadingBar");
+    
+    const overlay = document.getElementById("loadingOverlay");
+    const label = document.getElementById("statusLabel");
+    const bar = document.getElementById("progressBar");
+    
+    overlay.style.display = "flex";
 
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        bar.style.width = `${((i + 1) / files.length) * 100}%`;
-
+    for (let file of files) {
         try {
             if (file.name.endsWith(".zip")) {
                 const zip = await JSZip.loadAsync(file);
-                const names = Object.keys(zip.files);
-
-                for (let name of names) {
+                const entries = Object.keys(zip.files).filter(name => !zip.files[name].dir);
+                
+                for (let i = 0; i < entries.length; i++) {
+                    const name = entries[i];
                     const entry = zip.files[name];
-                    if (entry.dir) continue;
                     const shortName = name.split('/').pop();
                     
-                    updateFileStatus(shortName);
+                    label.innerText = `Extraindo: ${shortName}`;
+                    bar.style.width = `${((i + 1) / entries.length) * 100}%`;
 
                     if (name.endsWith(".txt")) {
                         const content = await entry.async("string");
-                        await saveInNewTransaction("messages", content);
+                        await syncSave("messages", content);
                     } else {
                         const blob = await entry.async("blob");
-                        await saveInNewTransaction("media", { name: shortName, data: blob });
+                        await syncSave("media", { name: shortName, data: blob });
                     }
+                    // Pequena pausa de 5ms para evitar que a transação trave
+                    await new Promise(r => setTimeout(r, 5));
                 }
-            } else if (file.name.endsWith(".txt")) {
-                updateFileStatus(file.name);
-                await saveInNewTransaction("messages", await file.text());
             } else {
-                updateFileStatus(file.name);
-                await saveInNewTransaction("media", { name: file.name, data: file });
+                label.innerText = `Processando: ${file.name}`;
+                if (file.name.endsWith(".txt")) await syncSave("messages", await file.text());
+                else await syncSave("media", { name: file.name, data: file });
             }
         } catch (err) {
             console.error("Erro no arquivo:", file.name, err);
+            document.getElementById("errorLabel").innerText = "Erro: " + err.message;
+            document.getElementById("errorLabel").style.display = "block";
         }
     }
     
-    document.getElementById("loadingBarContainer").style.display = "none";
-    const statusDiv = document.getElementById("process-status");
-    if (statusDiv) statusDiv.remove();
-    loadHistory();
+    label.innerText = "Concluído! Atualizando...";
+    setTimeout(() => {
+        overlay.style.display = "none";
+        loadHistory();
+    }, 1500);
 };
 
-function saveInNewTransaction(type, payload) {
-    return new Promise((resolve) => {
+// SALVAMENTO SINCRONIZADO (Garante que a transação só abra quando houver dado pronto)
+function syncSave(type, payload) {
+    return new Promise((resolve, reject) => {
+        // Abrimos a transação EXATAMENTE na hora de salvar
         const tx = db.transaction([type], "readwrite");
         const store = tx.objectStore(type);
 
@@ -147,7 +110,6 @@ function saveInNewTransaction(type, payload) {
                     const mes = dParts[1];
                     const ts = new Date(ano, mes - 1, dia, hora.split(/[:\.]/)[0], hora.split(/[:\.]/)[1]).getTime();
                     const hash = `${ts}_${remetente.trim()}_${texto.trim()}`;
-                    
                     try { store.add({ sender: remetente.trim(), text: texto.trim(), ts: ts || Date.now(), hash: hash }); } catch(e) {}
                 }
             });
@@ -156,12 +118,34 @@ function saveInNewTransaction(type, payload) {
         }
 
         tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
+        tx.onerror = () => reject(tx.error);
     });
 }
 
+// Renderização, Filtros e Clear (mantenha os mesmos das versões anteriores)
+function renderMessages(list) {
+    const container = document.getElementById("messages");
+    container.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+    list.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "msg";
+        let mediaHtml = "";
+        const textTrim = m.text.trim();
+        if (mediaCache.has(textTrim)) {
+            const url = mediaCache.get(textTrim);
+            if (textTrim.match(/\.(jpg|jpeg|png|webp|gif)$/i)) mediaHtml = `<div class="media-container"><img src="${url}" loading="lazy"></div>`;
+            else if (textTrim.match(/\.(mp4|webm)$/i)) mediaHtml = `<div class="media-container"><video src="${url}" controls></video></div>`;
+            else if (textTrim.match(/\.(opus|mp3|m4a|ogg|wav)$/i)) mediaHtml = `<audio src="${url}" controls></audio>`;
+        }
+        div.innerHTML = `<div class="sender">${m.sender}</div><div>${m.text}</div>${mediaHtml}<div class="time">${new Date(m.ts).toLocaleString()}</div>`;
+        fragment.appendChild(div);
+    });
+    container.appendChild(fragment);
+    container.scrollTop = container.scrollHeight;
+}
+
 document.getElementById("fileInput").addEventListener("change", e => processFiles(e.target.files));
-document.getElementById("folderInput").addEventListener("change", e => processFiles(e.target.files));
 
 function filterMessages() {
     const term = document.getElementById("searchInput").value.toLowerCase();
@@ -169,16 +153,8 @@ function filterMessages() {
     renderMessages(filtered.slice(-500));
 }
 
-function filterByDate() {
-    const val = document.getElementById("dateFilter").value;
-    if (!val) return;
-    const start = new Date(val + "T00:00:00").getTime();
-    const end = start + 86400000;
-    renderMessages(allMessages.filter(m => m.ts >= start && m.ts < end));
-}
-
 function clearHistory() {
-    if (confirm("Deseja apagar tudo?")) {
+    if (confirm("Apagar tudo?")) {
         indexedDB.deleteDatabase("WhatsAppHistoryDB");
         location.reload();
     }
