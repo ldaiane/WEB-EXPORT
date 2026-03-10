@@ -3,28 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Export</title>
+    <title>Chat Viewer Pro</title>
     <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
+
     <header>
-        <div class="brand">Web Export</div>
-        <input type="file" id="fileInput" multiple accept=".txt,.zip">
+        <div class="brand">Meu Histórico</div>
+        <div class="actions">
+            <button onclick="clearHistory()" style="background: #f44336; color: white; border: none; padding: 5px; border-radius: 4px; font-size: 10px; margin-right: 10px;">Limpar Tudo</button>
+            <label for="fileInput" style="background: #25d366; color: white; padding: 8px; border-radius: 5px; cursor: pointer; font-size: 12px;">+ Importar ZIP/TXT</label>
+            <input type="file" id="fileInput" multiple accept=".txt,.zip" style="display: none;">
+        </div>
     </header>
 
-    <main id="chatList">
-        <div class="welcome-msg">
-            <p>Selecione um arquivo <b>.txt</b> ou <b>.zip</b> para começar.</p>
-        </div>
+    <main id="chatView" style="display: flex; height: calc(100vh - 55px);">
+        <div id="messages" style="flex: 1; overflow-y: auto; padding: 15px;">
+            </div>
     </main>
-
-    <div id="chatView">
-        <div class="chat-header">
-            <button onclick="closeChat()">←</button>
-            <div id="chatTitle">Conversa</div>
-        </div>
-        <div id="messages"></div>
-    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="app.js"></script>
