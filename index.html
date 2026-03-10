@@ -2,28 +2,24 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Viewer - Cinthya</title>
+    <title>WA Viewer - Cinthya</title>
     <script src="https://cdnjs.cloudflare.com"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #efe7dd; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        body { font-family: sans-serif; background: #efe7dd; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         header { background: #075e54; color: white; padding: 15px; text-align: center; font-weight: bold; }
-        #controls { background: white; padding: 20px; text-align: center; border-bottom: 1px solid #ddd; }
         #chat { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
-        .msg { background: white; margin: 8px 0; padding: 12px; border-radius: 10px; max-width: 85%; box-shadow: 0 1px 2px rgba(0,0,0,0.1); align-self: flex-start; word-wrap: break-word; }
+        .msg { background: white; margin: 5px 0; padding: 12px; border-radius: 8px; max-width: 85%; box-shadow: 0 1px 2px rgba(0,0,0,0.1); align-self: flex-start; font-size: 14px; }
         img, video { max-width: 100%; border-radius: 8px; margin-top: 10px; display: block; }
         audio { width: 100%; margin-top: 10px; }
-        .status { color: #555; font-size: 0.9em; margin-top: 10px; }
-        input[type="file"] { padding: 10px; cursor: pointer; background: #25d366; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-<header>VISUALIZADOR DE CONVERSAS - WHATSAPP</header>
+<header>VISUALIZADOR CINTHYA</header>
 
-<div id="controls">
+<div style="background: white; padding: 20px; text-align: center; border-bottom: 1px solid #ddd;">
     <input type="file" id="file-input" accept=".zip" multiple>
-    <div id="status" class="status">Selecione um ou mais arquivos ZIP da Cinthya.</div>
+    <p id="status" style="color: #666; font-size: 0.9em;">Selecione o ZIP da Cinthya aqui.</p>
 </div>
 
 <div id="chat"></div>
@@ -37,66 +33,68 @@
         const files = e.target.files;
         if (!files.length) return;
 
-        status.innerText = "Processando arquivos... Isso pode levar alguns segundos.";
+        status.innerText = "Lendo... aguarde.";
         chat.innerHTML = "";
         
-        const allMessages = new Map();
+        const allMessages = new Set();
         const mediaUrls = new Map();
 
         for (const file of files) {
             try {
                 const zip = await JSZip.loadAsync(file);
                 
-                // 1. Mapear arquivos no ZIP
+                // 1. Mapeia mídias (Busca profunda)
                 for (let path in zip.files) {
                     const entry = zip.files[path];
-                    if (entry.dir) continue;
-
-                    const fileName = path.split('/').pop();
-
-                    if (fileName.toLowerCase().endsWith('.txt')) {
-                        // Lê o texto da conversa
-                        const content = await entry.async("string");
-                        content.split('\n').forEach(line => {
-                            if (line.trim().length > 5) {
-                                // Usa a linha como chave para evitar duplicados
-                                allMessages.set(line.trim(), line.trim());
-                            }
-                        });
-                    } else if (fileName.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov)$/i)) {
-                        // Guarda as mídias na memória
+                    if (entry.dir || path.includes('__MACOSX')) continue;
+                    const fileName = path.split('/').pop().toLowerCase();
+                    if (fileName.match(/\.(jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov)$/i)) {
                         const blob = await entry.async("blob");
-                        mediaUrls.set(fileName.toLowerCase(), URL.createObjectURL(blob));
+                        mediaUrls.set(fileName, URL.createObjectURL(blob));
                     }
                 }
-            } catch (err) {
-                console.error("Erro no ZIP:", err);
-            }
+
+                // 2. Lê o texto (Tenta UTF-8 e UTF-16 para iPhone)
+                for (let path in zip.files) {
+                    const entry = zip.files[path];
+                    if (path.toLowerCase().endsWith('.txt') && !path.includes('__MACOSX')) {
+                        const buffer = await entry.async("arraybuffer");
+                        
+                        // TESTA CODIFICAÇÕES (iPhone usa UTF-16LE frequentemente)
+                        let text = "";
+                        const decoders = ['utf-8', 'utf-16le', 'windows-1252'];
+                        for (let enc of decoders) {
+                            text = new TextDecoder(enc).decode(buffer);
+                            if (text.includes(':') || text.includes('/')) break;
+                        }
+                        
+                        text.split(/\r?\n/).forEach(line => {
+                            if (line.trim().length > 5) allMessages.add(line.trim());
+                        });
+                    }
+                }
+            } catch (err) { console.error(err); }
         }
 
         if (allMessages.size === 0) {
-            status.innerText = "ERRO: Não encontrei mensagens. Verifique se o ZIP contém o arquivo .txt";
+            status.innerText = "Erro: O arquivo .txt não foi lido corretamente. Tente extrair o zip e ver se o .txt abre no seu PC.";
             return;
         }
 
-        // 2. Ordenar e mostrar no chat
-        const sortedMessages = Array.from(allMessages.values()).sort();
-        const fragment = document.createDocumentFragment();
-
-        sortedMessages.forEach(line => {
+        // 3. Renderiza (Ordenado por data)
+        const sorted = Array.from(allMessages).sort();
+        sorted.forEach(line => {
             const div = document.createElement('div');
             div.className = 'msg';
             
-            // Busca mídias na linha
             const fileMatch = line.match(/([\w\-. ]+\.(?:jpg|jpeg|png|webp|mp3|mp4|opus|ogg|pdf|m4a|mov))/i);
             let mediaHtml = "";
 
             if (fileMatch) {
-                const cleanName = fileMatch[1].trim().toLowerCase();
-                const url = mediaUrls.get(cleanName);
-                
+                const name = fileMatch[1].trim().toLowerCase();
+                const url = mediaUrls.get(name);
                 if (url) {
-                    const ext = cleanName.split('.').pop();
+                    const ext = name.split('.').pop();
                     if (['jpg','jpeg','png','webp'].includes(ext)) mediaHtml = `<img src="${url}">`;
                     else if (['mp3','opus','ogg','m4a'].includes(ext)) mediaHtml = `<audio controls src="${url}"></audio>`;
                     else if (['mp4','mov'].includes(ext)) mediaHtml = `<video controls src="${url}"></video>`;
@@ -104,10 +102,9 @@
             }
 
             div.innerHTML = `<span>${line}</span>${mediaHtml}`;
-            fragment.appendChild(div);
+            chat.appendChild(div);
         });
 
-        chat.appendChild(fragment);
         status.innerText = `Sucesso! ${allMessages.size} mensagens carregadas.`;
     };
 </script>
